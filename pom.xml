@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>org.pale</groupId>
+  <artifactId>gemininpc</artifactId>
+  <packaging>jar</packaging>
+  <version>0.0.0</version>
+  <properties>
+    <maven.compiler.source>1.7</maven.compiler.source>
+    <maven.compiler.target>1.7</maven.compiler.target>
+    
+    <!-- change these bits. -->
+    <server.dir>/home/white/GeminiNPC</server.dir>
+    <server.plugindir>${server.dir}</server.plugindir>
+    <gemininpc.bindir>${server.dir}</gemininpc.bindir>  
+  </properties>
+  
+  
+  <repositories>
+    <repository>
+      <id>spigot-repo</id>
+      <url>https://hub.spigotmc.org/nexus/content/repositories/snapshots/</url>
+    </repository>
+  </repositories>
+  
+  <dependencies>
+    <!--Spigot API-->
+    <dependency>
+      <groupId>org.spigotmc</groupId>
+      <artifactId>spigot-api</artifactId>
+      <version>1.18.2-R0.1-SNAPSHOT</version>
+      <scope>provided</scope>
+    </dependency>
+    <!--plugins we need to link against, in the server's plugins dir -->
+    <dependency>
+      <groupId>net.citizensnpcs</groupId>
+      <artifactId>api</artifactId>
+      <version>2.0.27</version>
+      <scope>system</scope>
+      <systemPath>${server.plugindir}/Citizens-2.0.29-b2511.jar</systemPath>
+    </dependency>
+  
+  <dependency>
+    <groupId>com.google.genai</groupId>
+    <artifactId>google-genai</artifactId>
+    <version>0.4.0</version>
+  </dependency>
+     
+      
+  </dependencies>
+  
+  <build>
+    <sourceDirectory>src</sourceDirectory>
+    <defaultGoal>clean install</defaultGoal>
+    <resources>
+      <resource>
+        <directory>.</directory>
+        <includes>
+          <include>plugin.yml</include>
+          <include>config.yml</include>
+        </includes>
+      </resource>
+      <resource>
+        <directory>${gemininpc.bindir}</directory>
+        <includes>
+          <include>**/*.class</include>
+        </includes>
+      </resource>
+    </resources>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>2.3.1</version>
+        <configuration>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.6.0</version>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <minimizeJar>true</minimizeJar>
+              <artifactSet>
+                <excludes>
+                  <exclude>classworlds:classworlds</exclude>
+                  <exclude>junit:junit</exclude>
+                  <exclude>jmock:*</exclude>
+                  <exclude>*:xml-apis</exclude>
+                  <exclude>org.apache.maven:lib:tests</exclude>
+                  <exclude>log4j:log4j:jar:</exclude>
+                </excludes>
+              </artifactSet>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+  
+</project>
