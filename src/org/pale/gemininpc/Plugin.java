@@ -125,7 +125,21 @@ public class Plugin extends JavaPlugin implements Listener {
         // load all of the personae - these are name:filename pairs, paths relative
         // to the Minecraft server directory. Each file contains a set of system
         // instructions for the AI.
-        final ConfigurationSection ps = c.getConfigurationSection("personae");
+        // get the common persona data - this is a set of instructions that are common to all -
+        // and prepend to the data for each persona.
+        ConfigurationSection ps = c.getConfigurationSection("main");
+        String common = Objects.requireNonNull(ps).getString("common", "");
+        if(!common.isEmpty()){
+            try {
+                Path p = Paths.get(common);
+                common = Files.readString(p);
+            } catch (Exception e) {
+                warn("CANNOT READ COMMON PERSONA " + common);
+                common = "";
+            }
+        }
+        log("Common persona data is " + common.length() + " chars");
+        ps = c.getConfigurationSection("personae");
         if (ps == null)
             throw new RuntimeException("No personae section in config");
 
@@ -135,12 +149,13 @@ public class Plugin extends JavaPlugin implements Listener {
                 String fn = ps.getString(name, "nofilename");
                 Path p = Paths.get(fn);
                 String data = Files.readString(p);
-                personae.put(name, data);
+                personae.put(name, common + "\n" + data);
                 log("Loaded persona : " + name);
             } catch (Exception e) {
                 warn("CANNOT READ PERSONA " + name);
             }
         }
+
     }
 
     // Handy function to send a message to the command sender.
@@ -242,6 +257,10 @@ public class Plugin extends JavaPlugin implements Listener {
         }
     }
 
+    public String getPersonaString(String persona) {
+        return personae.getOrDefault(persona, null);
+    }
+
     /**
      * Commands
      */
@@ -251,10 +270,13 @@ public class Plugin extends JavaPlugin implements Listener {
         String persona = c.getArgs()[0];
         GeminiNPCTrait t = c.getCitizen();
         if (personae.containsKey(persona)) {
-            t.setPersona(personae.get(persona));
+            t.setPersona(persona);
         } else {
             Plugin.warn("No persona " + persona + " exists");
+            c.msg("Persona " + ChatColor.RED + persona + ChatColor.YELLOW
+                    + " does not exist");
         }
+        c.msg("Set persona to " + ChatColor.AQUA + persona);
     }
 
 
@@ -269,10 +291,28 @@ public class Plugin extends JavaPlugin implements Listener {
 
     @Cmd(desc = "reload all personae (will reinitialise all chats)", argc = 0)
     public void reload(CallInfo c) {
+        reloadConfig();
         FileConfiguration cc = this.getConfig();
         loadPersonae(cc);
         for (String name : personae.keySet()) {
             c.msg("Loaded " + ChatColor.AQUA + " " + name);
+        }
+    }
+
+    @Cmd(desc = "list all available personae", argc = 0)
+    public void list(CallInfo c) {
+        c.msg("Available personae:");
+        for (String name : personae.keySet()) {
+            c.msg(ChatColor.AQUA + name);
+        }
+    }
+
+    @Cmd(desc="list all NPCs with a persona", argc=0)
+    public void listnpcs(CallInfo c) {
+        c.msg("NPCs with a persona:");
+        for (NPC npc : chatters) {
+            GeminiNPCTrait t = getTraitFor(npc);
+            c.msg(ChatColor.AQUA + npc.getName()+" : "+t.personaName);
         }
     }
 }

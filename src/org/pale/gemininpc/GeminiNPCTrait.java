@@ -8,6 +8,7 @@ import net.citizensnpcs.api.trait.TraitName;
 import net.citizensnpcs.api.util.DataKey;
 
 import org.bukkit.*;
+import org.bukkit.block.Biome;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -26,6 +27,17 @@ import com.google.genai.types.Content;
 //The Trait class also implements Listener so you can add EventHandlers directly to your trait.
 @TraitName("gemininpc") // convenience annotation in recent CitizensAPI versions for specifying trait name
 public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
+
+    // This string is a block of standard instructions that describe the rules of the conversation. It precedes the
+    // persona string, and is used to set the context for the AI. It is sent to the AI when the chat is first
+    // created.
+    static final String STANDARD_INSTRUCTIONS =
+    """
+     Each input will consist of lines of the form "username: text" or "environment: text". The "environment" lines
+     describe your general environment, such as the weather and time of day. When asked about the time you should use
+     this information. The other lines give the name of the user speaking to you and the conversation you should
+     respond to.
+     """.replaceAll("[\\t\\n\\r]+"," ");
 
     /**
      * Initialise the trait.
@@ -53,9 +65,7 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
     // can be creepy as heck.
     static final String DEFAULT_PERSONA = "You have no memory of who or what you are.";
 
-    // this is the persona string that will be used to create the chat session - it's sent as a
-    // "system instruction".
-    String personaString = DEFAULT_PERSONA;
+    String personaName = "default"; // the name of the persona
 
     // Here you should load up any values you have previously saved (optional).
     // This does NOT get called when applying the trait for the first time, only loading onto an existing npc at server start.
@@ -63,12 +73,12 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
     // This is called BEFORE onSpawn, npc.getBukkitEntity() will return null.
     public void load(DataKey key) {
         // we load the entire persona string.
-        personaString = key.getString("persona", DEFAULT_PERSONA);
+        personaName = key.getString("pname", "default");
     }
 
     // Save settings for this NPC (optional). These values will be persisted to the Citizens saves file
     public void save(DataKey key) {
-        key.setString("persona", personaString);
+        key.setString("pname", personaName);
     }
 
     // Called every tick
@@ -142,8 +152,18 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
         }
     }
 
-    void setPersona(String ps) {
-        personaString = ps;
+    private String getPersonaString(String pname) {
+        // get the persona string from the plugin
+        String s = Plugin.getInstance().getPersonaString(pname);
+        if (s == null) {
+            // if we don't have a persona, use the default.
+            s = DEFAULT_PERSONA;
+        }
+        return s;
+    }
+
+    void setPersona(String pname) {
+        personaName = pname;
         chat = null; // a new chat will need to be made.
     }
 
@@ -179,6 +199,94 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
         return r;
     }
 
+    String prevEnv = ""; // previous weather string
+    /**
+     * Get the weather as a string preceded by "environment: " if it has changed. Return the empty string
+     * otherwise
+     * @return the weather as a string or empty string
+     */
+    private String getEnvironmentString(){
+        StringBuilder sb = new StringBuilder().append("environment: ");
+        World w = npc.getEntity().getLocation().getWorld();
+
+        if(npc.getEntity().getLocation().getBlock().getLightFromSky() == 0){
+            sb.append("You are underground and do not know the time or weather.\n");
+        } else {
+
+            long t = Objects.requireNonNull(w).getTime();
+            /* Commented out because it produces unreliable results when an NPC tries to be more accurate.
+            For example, saying "mid-morning approaching noon" when it's just "day".
+
+            // get time of day as a string - dawn, morning, noon, afternoon, evening, nighttime
+            String timeString = "day";
+            if (t > 22700 || t <= 450) {
+                timeString="dawn";
+            } else if (t > 4000 && t <= 8000) {
+                timeString="noon";
+            } else if (t > 11500 && t <= 13500) {
+                timeString="dusk";
+            } else if (t > 16000 && t <= 20000) {
+                timeString="midnight";
+            } else if (t > 12000) {
+                timeString="night";
+            }
+            */
+            int hours = (int) ((t / 1000 + 6) % 24);
+            int minutes = (int) (60 * (t % 1000) / 1000);
+            String timeString = String.format("%02d:%02d", hours, minutes);
+            sb.append("The time is ").append(timeString).append(". The weather is ");
+
+            // I need to tell if it's snow or rain.
+            // this is a really rough method - it seems pretty impossible to do it properly.
+            Biome b = w.getBiome(npc.getEntity().getLocation());
+            boolean isSnow = false;  // if stormy, is it snow or rain?
+            // get altitude of npc
+            double y = npc.getEntity().getLocation().getY();
+            switch (b) {  // ugh.
+                case FROZEN_OCEAN, DEEP_FROZEN_OCEAN, SNOWY_BEACH, SNOWY_PLAINS, SNOWY_SLOPES, SNOWY_TAIGA:
+                    isSnow = true;
+                    break;
+                case WINDSWEPT_GRAVELLY_HILLS, WINDSWEPT_HILLS, WINDSWEPT_FOREST, STONY_SHORE, DRIPSTONE_CAVES:
+                    if (y > 120.0) isSnow = true;
+                    break;
+                case TAIGA, OLD_GROWTH_SPRUCE_TAIGA:
+                    if (y > 160.0) isSnow = true;
+                    break;
+                case OLD_GROWTH_PINE_TAIGA:
+                    if (y > 200.0) isSnow = true;
+                    break;
+                default:
+                    break;
+            }
+            String weatherString = "clear";
+            if (timeString.equals("midnight") || timeString.equals("night"))
+                weatherString = "dark";
+            else if (timeString.equals("dawn") || timeString.equals("dusk"))
+                weatherString = "twilight";
+
+            if (w.isThundering()) {
+                weatherString = "stormy and thundering";
+            } else if (w.hasStorm()) {
+                if (isSnow) {
+                    weatherString = "snowing";
+                } else {
+                    weatherString = "raining";
+                }
+            }
+            sb.append(weatherString).append(".\n");
+        }
+
+        String name = npc.getFullName();
+
+        if (!prevEnv.contentEquals(sb)) {
+            plugin.getLogger().info(name+"  Env changed: " + sb);
+            prevEnv = sb.toString();
+            return prevEnv;
+        }
+        plugin.getLogger().info(name+"  Env unchanged: " + sb);
+        return ""; // no change
+    }
+
     /**
      * This is called when the NPC is spoken to. It will be called from the
      * ChatEventListener when a player sends a message. We check to see if the
@@ -194,27 +302,36 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
 
         // if the chat session is null, we need to create it.
         if (chat == null) {
+            String personaString = getPersonaString(personaName);
             // generate the system instruction from the persona string.
-            Content systemInstruction = Content.fromParts(Part.fromText(personaString));
+            Content systemInstruction = Content.fromParts(
+                    Part.fromText("Your name is " + npc.getFullName() + ". "),
+                    Part.fromText(STANDARD_INSTRUCTIONS),
+                    Part.fromText(personaString));
             // add this to the config.
             GenerateContentConfig config = GenerateContentConfig.builder()
-                    .maxOutputTokens(1024)
+                    .maxOutputTokens(256)   // we want quite short, conversational responses
                     .systemInstruction(systemInstruction)
                     .build();
             // create new chat with the model specified in the plugin (which comes from
             // the configuration file).
             chat = plugin.client.chats.create(plugin.model, config);
+            plugin.getLogger().info("NPC " + npc.getFullName() + " has been created with model " + plugin.model);
+            plugin.getLogger().info("Persona: " + personaString);
         }
 
         // look for nearby players, and only do something if there are some.
         List<Player> q = getNearPlayers(10); // audible distance
         plugin.getServer().getLogger().info("Players nearby :" + q);
         if (!q.isEmpty()) {
-            String toName = player.getDisplayName();
+            String toName = ChatColor.stripColor(player.getDisplayName());
             // start a new thread which sends to the AI and waits for the result
             new Thread(() -> {
-                plugin.getServer().getLogger().info("Sending to AI: " + input);
-                GenerateContentResponse response = chat.sendMessage(input); // send to AI
+                // build the input string
+                StringBuilder sb = new StringBuilder().append(getEnvironmentString());
+                sb.append(toName).append(": ").append(input).append("\n");
+                plugin.getServer().getLogger().info("Sending to AI: " + sb);
+                GenerateContentResponse response = chat.sendMessage(sb.toString()); // send to AI
                 if (response == null) {
                     plugin.getServer().getLogger().severe("No response");
                     return;

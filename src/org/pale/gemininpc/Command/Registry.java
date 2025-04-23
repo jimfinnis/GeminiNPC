@@ -11,8 +11,6 @@ import java.util.TreeMap;
 import org.bukkit.ChatColor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
-import org.pale.gemininpc.Command.CallInfo;
-import org.pale.gemininpc.Command.Cmd;
 import org.pale.gemininpc.Plugin;
 
 public class Registry {
@@ -21,7 +19,7 @@ public class Registry {
         String permission;
         Method m;
         Object obj;
-        private Cmd cmd;
+        private final Cmd cmd;
         
         
         Entry(String name,String perm,Cmd cmd,Object o,Method m){
@@ -56,18 +54,15 @@ public class Registry {
                     return;
                 }
                 m.invoke(obj, c);
-            } catch (IllegalAccessException e) {
-                e.printStackTrace();
-            } catch (IllegalArgumentException e) {
-                e.printStackTrace();
-            } catch (InvocationTargetException e) {
+            } catch (IllegalAccessException | IllegalArgumentException | InvocationTargetException e) {
+                //noinspection CallToPrintStackTrace
                 e.printStackTrace();
             }
         }
     }
     
-    private Map<String,Entry> registry = new HashMap<String,Entry>();
-    private String rootCmdName;
+    private final Map<String,Entry> registry = new HashMap<>();
+    private final String rootCmdName;
     
     public Registry(String rootCmdName){
         this.rootCmdName = rootCmdName;
@@ -78,14 +73,14 @@ public class Registry {
         for(Method m : sortedMethods(handler)){
             Cmd cmd = m.getAnnotation(Cmd.class);
             if(cmd!=null){
-                Class<?> params[] = m.getParameterTypes();
+                Class<?>[] params = m.getParameterTypes();
                 if(params.length != 1 || !params[0].equals(CallInfo.class)){
                     Plugin.warn("Error in @Sub on method "+m.getName()+": parameter must be one CallInfo");
                 } else {					
                     String name = cmd.name();
-                    if(name.equals(""))name = m.getName();
+                    if(name.isEmpty())name = m.getName();
                     String perm = cmd.permission();
-                    if(perm.equals(""))perm = null;
+                    if(perm.isEmpty())perm = null;
                     registry.put(name, new Entry(name,perm,cmd,handler,m));
                 }
             }
@@ -94,13 +89,14 @@ public class Registry {
     
     /**
      * Handle a command string, assuming the command name is correct for the plugin.
-     * @param s
+     * @param sender the command sender
+     * @param args the command's arguments
      */
     public void handleCommand(CommandSender sender,String[] args){
         if(args.length == 0){
-            String cmds="";
-            for(String cc: registry.keySet())cmds+=cc+" ";
-            Plugin.sendCmdMessage(sender,cmds);
+            StringBuilder cmds= new StringBuilder();
+            for(String cc: registry.keySet()) cmds.append(cc).append(" ");
+            Plugin.sendCmdMessage(sender, cmds.toString());
         } else {
             String cmdName = args[0];
             if(!registry.containsKey(cmdName)){
@@ -116,15 +112,15 @@ public class Registry {
     
     /**
      * Reflect the methods on this object, sorted by name.
-     * @param handler
+     * @param handler the object to reflect
      * @return an ArrayList of methods.
      */
     private ArrayList<Method> sortedMethods(Object handler) {
-        TreeMap<String, Method> methodMap = new TreeMap<String, Method>();
+        Map<String, Method> methodMap = new TreeMap<>();
         for (Method method : handler.getClass().getDeclaredMethods()) {
             methodMap.put(method.getName(), method);
         }
-        return new ArrayList<Method>(methodMap.values());
+        return new ArrayList<>(methodMap.values());
     }
     
     public void listCommands(CallInfo c) {

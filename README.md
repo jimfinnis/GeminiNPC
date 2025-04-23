@@ -26,8 +26,23 @@ or similar.
 
 Don't talk to the bot before you do this. It won't break, but the
 blank default persona will really creep you out.
-    
+
+Common data to all personae - perhaps describing the setting - can be added by putting a "common" file in the 
+main section:
+```
+main:
+    common: plugins/GeminiNPC/common
+```
+This will be prepended to all the persona strings.
 
 
+## What is sent
+
+Each turn, the plugin sends a string that looks like this:
+```
+environment: It is evening. It is raining.
+playername: Hello, NPC - how are you this evening?
+```
+The environment string is the current time and weather, and the playername string is the text the player wrote.
 
 

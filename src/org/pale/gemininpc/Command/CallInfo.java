@@ -9,8 +9,8 @@ public class CallInfo {
 	private final CommandSender sender;
 	private final Player p;
 	private final String[] args;
-	private String cmd;
-	private GeminiNPCTrait trait;
+	private final String cmd;
+	private final GeminiNPCTrait trait;
 	
 	public CallInfo (String cmd,CommandSender p, String[] args){
 		this.sender = p;
