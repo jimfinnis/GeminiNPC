@@ -11,7 +11,8 @@
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
     
-    <!-- change these bits. -->
+    <!-- change these bits. Originally we actually linked against plugins in the live server dir.
+    Hence the name here. -->
     <server.dir>${project.basedir}</server.dir>
     <server.plugindir>${server.dir}</server.plugindir>
     <gemininpc.bindir>${server.dir}</gemininpc.bindir>  
@@ -33,7 +34,7 @@
       <version>1.18.2-R0.1-SNAPSHOT</version>
       <scope>provided</scope>
     </dependency>
-    <!--plugins we need to link against, in the server's plugins dir -->
+    <!--plugins we need to link against, in the server's plugins dir (or the project root, as I've done it here)-->
     <dependency>
       <groupId>net.citizensnpcs</groupId>
       <artifactId>api</artifactId>
@@ -41,8 +42,21 @@
       <scope>system</scope>
       <systemPath>${server.plugindir}/Citizens-2.0.29-b2511.jar</systemPath>
     </dependency>
-  
-  <dependency>
+    <dependency>
+      <groupId>org.mcmonkey</groupId>
+      <artifactId>sentinel</artifactId>
+      <version>2.5.0-SNAPSHOT-b461</version>
+      <scope>system</scope>
+      <systemPath>${server.plugindir}/Sentinel-2.5.0-SNAPSHOT-b461.jar</systemPath>
+    </dependency>
+    <dependency>
+      <groupId>net.livecar.nuttyworks.npc_destinations</groupId>
+      <artifactId>NPC_Destinations</artifactId>
+      <version>2_6_11</version>
+      <scope>system</scope>
+      <systemPath>${server.plugindir}/NPC_Destinations-2_6_11.jar</systemPath>
+    </dependency>
+    <dependency>
     <groupId>com.google.genai</groupId>
     <artifactId>google-genai</artifactId>
     <version>0.4.0</version>

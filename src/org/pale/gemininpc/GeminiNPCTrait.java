@@ -19,6 +19,8 @@ import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
 import com.google.genai.types.Part;
 import com.google.genai.types.Content;
+import org.pale.gemininpc.plugininterfaces.NPCDestinations;
+import org.pale.gemininpc.plugininterfaces.Sentinel;
 
 
 //This is your trait that will be applied to a npc using the /trait mytraitname command.
@@ -50,6 +52,9 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
     Plugin plugin;           // useful pointer back to the plugin shared by all traits
     private int tickint = 0;        // a counter to slow down updates
     public long timeSpawned = 0;    // ticks since spawn
+
+    Map<String,Long> lastGreetedTime = new HashMap<>(); // last time we greeted a player
+    Set<Player> nearPlayersForGreet = new HashSet<>(); // players nearby
 
     // The "chat" part of the GenAI api is synchronous, so we use a queue and a thread to
     // make it non-blocking. Requests are sent to the AI in a thread, and when the response
@@ -144,12 +149,15 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
         while(!queue.isEmpty()) {
             String s = queue.poll();
             if (s != null) { // it's a double check, yes.
-                for (Player p : getNearPlayers(10.0)) {
+                for (Player p : getNearPlayers(20.0)) {
                     Plugin.log("message in queue : " + s);
                     p.sendMessage(s);
                 }
+            } else {
+                Plugin.log("queue is empty or null msg");
             }
         }
+        processGreet();
     }
 
     private String getPersonaString(String pname) {
@@ -179,8 +187,8 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
      * send chat messages to. It also resets the last time we saw a player, which can
      * be useful.
      */
-    List<Player> getNearPlayers(double d) {
-        List<Player> r = new ArrayList<>();
+    Set<Player> getNearPlayers(double d) {
+        Set<Player> r = new HashSet<>();
         // note the 1 - we have to be roughly on the same level, AND we have to be able to see them.
         // Actually, we check to see if they can see *us*.
         for (Entity e : npc.getEntity().getNearbyEntities(d, 1, d)) {
@@ -197,6 +205,39 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
             }
         }
         return r;
+    }
+
+    /**
+     * Part of the environment builder - append any combat data
+     * @return
+     */
+    private void appendCombatString(StringBuilder sb) {
+        Sentinel.SentinelData d = plugin.getInstance().sentinelPlugin.makeData(npc);
+        if(d == null)
+            return;
+        // first, how long ago did we see combat
+        double t = d.timeSinceAttack / 20; // convert to seconds
+        if (t > 60) {
+            sb.append("You have not seen combat for ").append((int) t / 60).append(" minutes.\n");
+        } else if (t > 0) {
+            sb.append("You have not seen combat for ").append((int) t).append(" seconds.\n");
+        } else {
+            sb.append("You are in combat!\n");
+        }
+        // now, are we guarding someone?
+        if (d.guarding != null) {
+            sb.append("You are guarding ").append(d.guarding).append(".\n");
+        } else {
+            sb.append("You are not guarding anyone.\n");
+        }
+        // health.
+        double h = d.health;
+        if (h >= 99.0) {
+            sb.append("You are at full health.\n");
+        } else {
+            sb.append("You are at ").append((int) h).append("% health.\n");
+        }
+
     }
 
     String prevEnv = ""; // previous weather string
@@ -264,7 +305,7 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
             else if (timeString.equals("dawn") || timeString.equals("dusk"))
                 weatherString = "twilight";
 
-            if (w.isThundering()) {
+            if (w.isThundering() && w.hasStorm()) {
                 weatherString = "stormy and thundering";
             } else if (w.hasStorm()) {
                 if (isSnow) {
@@ -275,6 +316,9 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
             }
             sb.append(weatherString).append(".\n");
         }
+
+        // now, add the combat data if this is a Sentinel
+        appendCombatString(sb);
 
         String name = npc.getFullName();
 
@@ -321,7 +365,7 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
         }
 
         // look for nearby players, and only do something if there are some.
-        List<Player> q = getNearPlayers(10); // audible distance
+        Set<Player> q = getNearPlayers(10); // audible distance
         plugin.getServer().getLogger().info("Players nearby :" + q);
         if (!q.isEmpty()) {
             String toName = ChatColor.stripColor(player.getDisplayName());
@@ -347,4 +391,22 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
         }
     }
 
+    private void processGreet(){
+        Set<Player> players = getNearPlayers(10);
+        // pick one who isn't in the "near players for greet" list - i.e. who has just turned up
+        for (Player p : players) {
+            if (!nearPlayersForGreet.contains(p)) {
+                // make sure we haven't greeted them recently
+                Long lastGreet = lastGreetedTime.get(p.getName().toLowerCase());
+                if (lastGreet == null || (System.currentTimeMillis() - lastGreet) > 60000) { // 1 minute
+                    // greet them by passing a special input to respondTo
+                    respondTo(p, "(enters)");
+                    nearPlayersForGreet.add(p);
+                    // remember when we greeted them
+                    lastGreetedTime.put(p.getName().toLowerCase(), System.currentTimeMillis());
+                }
+            }
+        }
+        nearPlayersForGreet = players; // update the list of players we have greeted
+    }
 }

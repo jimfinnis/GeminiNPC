@@ -27,6 +27,8 @@ import org.bukkit.configuration.file.FileConfiguration;
 
 import org.jetbrains.annotations.NotNull;
 import org.pale.gemininpc.Command.*;
+import org.pale.gemininpc.plugininterfaces.NPCDestinations;
+import org.pale.gemininpc.plugininterfaces.Sentinel;
 
 
 public class Plugin extends JavaPlugin implements Listener {
@@ -39,6 +41,10 @@ public class Plugin extends JavaPlugin implements Listener {
     public Client client; // the client for the AI API - visible for the trait
 
     private final Registry commandRegistry = new Registry(ROOTCMDNAME);
+
+    // interfaces to other plugins
+    NPCDestinations ndPlugin;
+    Sentinel sentinelPlugin;
 
     /**
      * Use this to get plugin instances - don't play silly buggers creating new
@@ -86,6 +92,10 @@ public class Plugin extends JavaPlugin implements Listener {
             return;
         }
 
+        // construct interfaces to other plugins
+        ndPlugin = new NPCDestinations();
+        sentinelPlugin = new Sentinel();
+
         //Register.
         net.citizensnpcs.api.CitizensAPI
                 .getTraitFactory()
@@ -94,6 +104,7 @@ public class Plugin extends JavaPlugin implements Listener {
         // if there isn't a config file, create one from the default that gets compiled into the jar (it's in
         // the project as config.yml)
         saveDefaultConfig();
+
 
         // register the commands automatically - these are tagged with @Cmd.
         commandRegistry.register(this); // register commands
@@ -241,7 +252,7 @@ public class Plugin extends JavaPlugin implements Listener {
             Location npcl = npc.getEntity().getLocation();
             Vector npcpos = npcl.toVector();
             if (npc.hasTrait(GeminiNPCTrait.class)) {
-                if (isNear(playerloc, npcl, 2)) { // chatters assume <2m and you're talking to them.
+                if (isNear(playerloc, npcl, 5)) { // chatters assume <5m and you're talking to them.
                     Vector tonpc = npcpos.subtract(playerpos).normalize();
                     // dot prod of facing vector and vector to player
                     double dot = tonpc.dot(playerdir);
