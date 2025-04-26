@@ -258,7 +258,7 @@ public class Plugin extends JavaPlugin implements Listener {
                     double dot = tonpc.dot(playerdir);
                     //log("Dot to "+npc.getName()+ " is "+Double.toString(dot));
                     // make sure we're roughly facing the NPC
-                    if (dot > 0.8) {
+                    if (dot > 0.6) {
                         // this is where the magic happens. As it were.
                         GeminiNPCTrait ct = npc.getOrAddTrait(GeminiNPCTrait.class);
                         ct.respondTo(player, msg);
@@ -319,7 +319,7 @@ public class Plugin extends JavaPlugin implements Listener {
     }
 
     @Cmd(desc="list all NPCs with a persona", argc=0)
-    public void listnpcs(CallInfo c) {
+    public void npcs(CallInfo c) {
         c.msg("NPCs with a persona:");
         for (NPC npc : chatters) {
             GeminiNPCTrait t = getTraitFor(npc);
