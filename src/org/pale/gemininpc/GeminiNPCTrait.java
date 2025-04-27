@@ -8,14 +8,11 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.citizensnpcs.api.CitizensAPI;
-import net.citizensnpcs.api.event.NPCRightClickEvent;
 import net.citizensnpcs.api.trait.TraitName;
 import net.citizensnpcs.api.util.DataKey;
 
 import org.bukkit.*;
 import org.bukkit.block.Biome;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -28,9 +25,10 @@ import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
 import com.google.genai.types.Part;
 import com.google.genai.types.Content;
-import org.mcmonkey.sentinel.SentinelPlugin;
 import org.mcmonkey.sentinel.SentinelTrait;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
+import org.pale.jcfutils.region.Region;
+import org.pale.jcfutils.region.RegionManager;
 
 
 //This is your trait that will be applied to a npc using the /trait mytraitname command.
@@ -469,23 +467,6 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
         } else {
 
             long t = Objects.requireNonNull(w).getTime();
-            /* Commented out because it produces unreliable results when an NPC tries to be more accurate.
-            For example, saying "mid-morning approaching noon" when it's just "day".
-
-            // get time of day as a string - dawn, morning, noon, afternoon, evening, nighttime
-            String timeString = "day";
-            if (t > 22700 || t <= 450) {
-                timeString="dawn";
-            } else if (t > 4000 && t <= 8000) {
-                timeString="noon";
-            } else if (t > 11500 && t <= 13500) {
-                timeString="dusk";
-            } else if (t > 16000 && t <= 20000) {
-                timeString="midnight";
-            } else if (t > 12000) {
-                timeString="night";
-            }
-            */
             int hours = (int) ((t / 1000 + 6) % 24);
             int minutes = (int) (60 * (t % 1000) / 1000);
             String timeString = String.format("%02d:%02d", hours, minutes);
@@ -529,6 +510,14 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
                 }
             }
             sb.append(weatherString).append(".\n");
+
+            RegionManager rm = RegionManager.getManager(w);
+            if (rm != null) {
+                Region region = rm.getSmallestRegion(npc.getEntity().getLocation());
+                if (region != null) {
+                    sb.append("You are in region ").append(region).append(".\n");
+                }
+            }
         }
 
         // now, add the combat data if this is a Sentinel

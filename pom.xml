@@ -43,6 +43,13 @@
       <systemPath>${server.plugindir}/Citizens-2.0.29-b2511.jar</systemPath>
     </dependency>
     <dependency>
+      <groupId>org.pale</groupId>
+      <artifactId>jcfutils</artifactId>
+      <version>1.1.1</version>
+      <scope>system</scope>
+      <systemPath>${server.plugindir}/jcfutils-1.1.1.jar</systemPath>
+    </dependency>
+    <dependency>
       <groupId>org.mcmonkey</groupId>
       <artifactId>sentinel</artifactId>
       <version>2.5.0-SNAPSHOT-b461</version>
@@ -111,6 +118,14 @@
               <minimizeJar>true</minimizeJar>
               <artifactSet>
                 <excludes>
+                  <!-- we don't want to include the server's plugins in our jar -->
+                  <exclude>net.citizensnpcs:*</exclude>
+                  <exclude>org.spigotmc:*</exclude>
+                  <exclude>org.bukkit:*</exclude>
+                  <exclude>org.mcmonkey:*</exclude>
+                  <exclude>net.livecar.nuttyworks:*</exclude>
+                    <exclude>org.pale:jcfutils</exclude>
+
                   <exclude>classworlds:classworlds</exclude>
                   <exclude>junit:junit</exclude>
                   <exclude>jmock:*</exclude>
