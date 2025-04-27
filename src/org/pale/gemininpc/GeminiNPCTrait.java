@@ -3,6 +3,7 @@ package org.pale.gemininpc;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.time.Instant;
+import java.util.stream.Collectors;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -13,6 +14,7 @@ import net.citizensnpcs.api.util.DataKey;
 
 import org.bukkit.*;
 import org.bukkit.block.Biome;
+import org.bukkit.block.Block;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -452,6 +454,11 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
 
     String prevEnv = ""; // previous weather string
 
+    // we have to do a getNearbyEntities query in the main thread, so the trait holds onto this for use
+    // in getEnvironmentString. It also gets reused in a few places.
+
+    Set<Player> nearPlayers;
+
     /**
      * Get the weather as a string preceded by "environment: " if it has changed. Return the empty string
      * otherwise
@@ -462,10 +469,15 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
         StringBuilder sb = new StringBuilder().append("environment: ");
         World w = npc.getEntity().getLocation().getWorld();
 
-        if (npc.getEntity().getLocation().getBlock().getLightFromSky() == 0) {
+        Block blk = npc.getEntity().getLocation().getBlock();
+
+        byte skyLight = blk.getLightFromSky();
+        byte blockLight = blk.getLightFromBlocks();
+        byte totalLight = blk.getLightLevel();
+
+        if (skyLight == 0) {
             sb.append("You are underground and do not know the time or weather.\n");
         } else {
-
             long t = Objects.requireNonNull(w).getTime();
             int hours = (int) ((t / 1000 + 6) % 24);
             int minutes = (int) (60 * (t % 1000) / 1000);
@@ -511,14 +523,39 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
             }
             sb.append(weatherString).append(".\n");
 
-            RegionManager rm = RegionManager.getManager(w);
-            if (rm != null) {
-                Region region = rm.getSmallestRegion(npc.getEntity().getLocation());
-                if (region != null) {
-                    sb.append("You are in region ").append(region).append(".\n");
+        }
+
+        // add JCFUtils region data
+        RegionManager rm = RegionManager.getManager(w);
+        if (rm != null) {
+            Region region = rm.getSmallestRegion(npc.getEntity().getLocation());
+            if (region != null) {
+                sb.append("You are in region ").append(region).append(".\n");
+                if(!region.desc.isEmpty()){
+                    sb.append("Region description: ").append(region.desc).append("\n");
                 }
             }
         }
+
+        // who is nearby?
+        if(!nearPlayers.isEmpty()) {
+            sb.append("You can see these players: ");
+            var st = nearPlayers.stream()
+                    .map(Player::getDisplayName)
+                    .map(ChatColor::stripColor);
+            var s = st.collect(Collectors.joining(" "));
+            sb.append(s+"\n");
+        }
+
+        // light conditions?
+        if(totalLight>0){
+            sb.append("The light level is ").append(totalLight);
+            sb.append("/15 of which ").append(blockLight).append(" is from lamps.\n");
+        } else {
+            sb.append("You are in darkness.\n");
+        }
+
+
 
         // now, add the combat data if this is a Sentinel
         appendCombatString(sb);
@@ -599,7 +636,7 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
         }
 
         // look for nearby players, and only do something if there are some.
-        Set<Player> nearPlayers = getNearPlayers(10); // audible distance
+        nearPlayers = getNearPlayers(12); // audible distance
         if (!nearPlayers.isEmpty()) {
             String toName = (player==null)?"event":ChatColor.stripColor(player.getDisplayName());
             // start a new thread which sends to the AI and waits for the result
@@ -631,7 +668,7 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
     }
 
     private void processGreet() {
-        Set<Player> players = getNearPlayers(10);
+        Set<Player> players = getNearPlayers(10); // shorter range than nearPlayers?
         // pick one who isn't in the "near players for greet" list - i.e. who has just turned up
         for (Player p : players) {
             if (!nearPlayersForGreet.contains(p)) {

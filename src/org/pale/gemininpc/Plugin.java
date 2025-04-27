@@ -150,23 +150,38 @@ public class Plugin extends JavaPlugin implements Listener {
             }
         }
         log("Common persona data is " + common.length() + " chars");
-        ps = c.getConfigurationSection("personae");
-        if (ps == null)
-            throw new RuntimeException("No personae section in config");
-
-        for (String name : ps.getKeys(false)) {
-            // get filename
-            try {
-                String fn = ps.getString(name, "nofilename");
-                Path p = Paths.get(fn);
-                String data = Files.readString(p);
-                personae.put(name, common + "\n" + data);
-                log("Loaded persona : " + name);
-            } catch (Exception e) {
-                warn("CANNOT READ PERSONA " + name);
+        List<String> ss = c.getStringList("persona-directories");
+        if(ss!=null){
+            for(String s:ss){
+                Path p = Paths.get(s);
+                if(!p.isAbsolute()){
+                    p = Paths.get(getServer().getWorldContainer().getAbsolutePath(),s);
+                }
+                if(!p.toFile().exists()){
+                    warn("Persona directory "+s+" does not exist");
+                } else {
+                    log("Persona directory is "+p.toString());
+                }
+                // get all the files in the directory
+                try {
+                    String finalCommon = common;
+                    Files.list(p).forEach(f -> {
+                        String name = f.getFileName().toString();
+                        try {
+                            String data = Files.readString(f);
+                            personae.put(name, finalCommon + "\n" + data);
+                            log("Loaded persona : " + name);
+                        } catch (Exception e) {
+                            warn("CANNOT READ PERSONA " + name);
+                        }
+                    });
+                } catch (Exception e) {
+                    warn("CANNOT READ PERSONA DIRECTORY " + s);
+                }
             }
+        } else {
+            log("No persona directories in config");
         }
-
     }
 
     // Handy function to send a message to the command sender.
@@ -265,7 +280,7 @@ public class Plugin extends JavaPlugin implements Listener {
                     double dot = tonpc.dot(playerdir);
                     //log("Dot to "+npc.getName()+ " is "+Double.toString(dot));
                     // make sure we're roughly facing the NPC
-                    if (dot > 0.6) {
+                    if (dot > 0.2) {
                         // this is where the magic happens. As it were.
                         GeminiNPCTrait ct = npc.getOrAddTrait(GeminiNPCTrait.class);
                         ct.respondTo(player, msg);
