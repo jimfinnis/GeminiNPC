@@ -29,6 +29,8 @@ public class Sentinel extends ExternalPluginInterface {
 	
 	public void setGuard(NPC n, UUID id){ // pass null to stop guarding
 		if(isValid()){
+			if(!n.hasTrait(SentinelTrait.class))
+				return;
 			SentinelTrait t = n.getTrait(SentinelTrait.class);
 			t.setGuarding(id);
 		}

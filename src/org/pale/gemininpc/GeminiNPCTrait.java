@@ -15,6 +15,7 @@ import net.citizensnpcs.api.util.DataKey;
 import org.bukkit.*;
 import org.bukkit.block.Biome;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -27,6 +28,8 @@ import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
 import com.google.genai.types.Part;
 import com.google.genai.types.Content;
+import org.mcmonkey.sentinel.SentinelPlugin;
+import org.mcmonkey.sentinel.SentinelTrait;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
 
 
@@ -41,29 +44,32 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
     // persona string, and is used to set the context for the AI. It is sent to the AI when the chat is first
     // created.
     static final String STANDARD_INSTRUCTIONS =
-    """
-    Each input will be in this form:
-    context: {
-        environment: string describing your environment (time, weather, etc)
-        inventory: list of items you have
-    }
-    input: {
-        player name: the input string from the player to which you should respond
-    }
-    The environment and inventory may be missing, in which case they are unchanged. 
-
-    Use this JSON schema for the output:
-    
-        Output = {'player': str, 'response': str, 'command': str}
-    
-    'player' is the name of the player to whom you are responding.
-    
-    The command is optional and should be used rarely. The "give ITEM" command will give an item
-    to the player you are responding to. ITEM must be a Minecraft material.
-    
-    Within the reponse string, actions should be in third person and in brackets, like this: (He smiles quietly). Use this
-    rarely. Always write from your point of view.
-    """;//.replaceAll("[\\t\\n\\r]+"," ");
+            """
+                    Each input will be in this form:
+                    context: {
+                        environment: string describing your environment (time, weather, etc)
+                        inventory: list of items you have
+                    }
+                    input: {
+                        player name: the input string from the player to which you should respond
+                        OR
+                        event: an event that occurred
+                    }
+                    The environment and inventory may be missing, in which case they are unchanged.
+                    
+                    Use this JSON schema for the output:
+                    
+                        Output = {'player': str, 'response': str, 'command': str}
+                    
+                    'player' is the name of the player to whom you are responding. It may be empty if you
+                    are responding to an event.
+                    
+                    The command is optional and should be used rarely. The "give ITEM" command will give an item
+                    to the player you are responding to. ITEM must be a Minecraft material.
+                    
+                    Within the reponse string, actions should be in third person and in brackets, like this: (He smiles quietly). Use this
+                    rarely. Always write from your point of view.
+                    """;//.replaceAll("[\\t\\n\\r]+"," ");
 
     /**
      * Initialise the trait.
@@ -77,7 +83,7 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
     private int tickint = 0;        // a counter to slow down updates
     public long timeSpawned = 0;    // ticks since spawn
 
-    Map<String,Long> lastGreetedTime = new HashMap<>(); // last time we greeted a player
+    Map<String, Long> lastGreetedTime = new HashMap<>(); // last time we greeted a player
     Set<Player> nearPlayersForGreet = new HashSet<>(); // players nearby
 
     // The "chat" part of the GenAI api is synchronous, so we use a queue and a thread to
@@ -121,9 +127,9 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
     }
 
     /**
-     *  Run code when your trait is attached to a NPC.
-     *  This is called BEFORE onSpawn, so npc.getBukkitEntity() will return null
-     *  This would be a good place to load configurable defaults for new NPCs.
+     * Run code when your trait is attached to a NPC.
+     * This is called BEFORE onSpawn, so npc.getBukkitEntity() will return null
+     * This would be a good place to load configurable defaults for new NPCs.
      */
     @Override
     public void onAttach() {
@@ -163,25 +169,23 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
         plugin.removeChatter(npc);
     }
 
-    @EventHandler
-    public void click(NPCRightClickEvent event) {
-        // check if this is our NPC
-        Plugin.log("click event on " + npc.getFullName() + "from player " + event.getClicker().getDisplayName());
-        if (event.getNPC() == npc) {
-            give(event.getClicker()); // give the item to the NPC
-        }
+    /**
+     * Called by the plugin when we made a kill
+     */
+    void onKill(String mobname){
+        respondTo(null, "(you killed a " + mobname + ")");
     }
 
     /**
      * This is called when a player right-clicks on an NPC. The held item is transferred into the NPCs
      * inventory, and the respondTo function is called with a special message.
      */
-    private void give(Player p){
+    void give(Player p) {
         ItemStack st = p.getInventory().getItemInMainHand();
         Material mat = st.getType();
-        if(mat == Material.AIR)return;     // nothing to take
+        if (mat == Material.AIR) return;     // nothing to take
 
-        if(npc.getEntity() instanceof Player) {
+        if (npc.getEntity() instanceof Player) {
             // we can only give to player-type npcs. For others, the item will just disappear.
             // first we add to the NPC.
             Player npcp = (Player) npc.getEntity();
@@ -209,17 +213,20 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
 
     /**
      * There's a command in the reponse and we should run it.
-     * @param p the player in the reponse (i.e. who we are responding to)
+     *
+     * @param p       the player in the reponse (i.e. who we are responding to)
      * @param command the command
      */
     private void performCommand(Player p, String command) {
-        if(command.startsWith("give ")){
-            String mname = command.substring(5).toUpperCase().trim().replaceAll(" ","_");
+        boolean hasSentinel = npc.hasTrait(SentinelTrait.class);
+        Sentinel s = plugin.getInstance().sentinelPlugin;
+        if (command.startsWith("give ")) {
+            String mname = command.substring(5).toUpperCase().trim().replaceAll(" ", "_");
             Material mat = Material.getMaterial(mname);
-            if(mat != null){
-                ItemStack st = new ItemStack(mat,1);
+            if (mat != null) {
+                ItemStack st = new ItemStack(mat, 1);
                 HashMap<Integer, ItemStack> map = p.getInventory().addItem(st);
-                if(map.isEmpty()) {
+                if (map.isEmpty()) {
                     // we added the item to the player
                     p.sendMessage(ChatColor.AQUA + npc.getFullName() + " gives you " + st.getType().name());
                     // if the npc has one, remove it
@@ -232,11 +239,69 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
                     p.sendMessage(ChatColor.RED + npc.getFullName() + " tried to give you " + st.getType().name() + " but your inventory is full.");
                 }
             } else {
-                plugin.log("Bad material name in command: "+command);
+                plugin.log("Bad material name in command: " + command);
+            }
+        }
+        if(command.startsWith("setguard")){
+            if(hasSentinel){
+                String name = command.substring(9).trim();
+                if(name.equalsIgnoreCase("none")){
+                    s.setGuard(npc, null);
+                    plugin.log("NPC " + npc.getFullName() + " unguarded.");
+                } else {
+                    Player p2 = plugin.getServer().getPlayer(name);
+                    if(p2 != null) {
+                        s.setGuard(npc, p2.getUniqueId());
+                        plugin.log("NPC " + npc.getFullName() + " is now guarding " + p2.getDisplayName());
+                    } else {
+                        plugin.log("Cannot find player to guard: " + name);
+                    }
+                }
+            } else {
+                plugin.log("NPC " + npc.getFullName() + " does not have Sentinel.");
+            }
+        } else if(command.startsWith("unguard")){
+            if(hasSentinel){
+                s.setGuard(npc, null);
+                plugin.log("NPC " + npc.getFullName() + " unguarded.");
+            } else {
+                plugin.log("NPC " + npc.getFullName() + " does not have Sentinel.");
             }
         }
     }
 
+    /**
+     * Handle a JSON response object, which contains response, command and player elements.
+     */
+    private void processResponse(JsonElement json){
+        // get the response, command and player
+        JsonObject o = json.getAsJsonObject();
+        JsonElement tmp;
+        tmp = o.get("response");
+        String response = (tmp == null || tmp.isJsonNull()) ? null : tmp.getAsString();
+        tmp = o.get("command");
+        String command = (tmp == null || tmp.isJsonNull()) ? null : tmp.getAsString();
+        tmp = o.get("player");
+        String playerName = (tmp == null || tmp.isJsonNull()) ? null : tmp.getAsString();
+        Plugin.log("responding to : " + playerName);
+        if (response != null) {
+            for (Player p : getNearPlayers(20.0)) {
+                // Plugin.log("message in queue : " + s);
+                String outmsg;
+                if(playerName==null || playerName.isEmpty())
+                    outmsg = ChatColor.AQUA + "[" + npc.getFullName() + "] " + ChatColor.WHITE + response;
+                else
+                    outmsg = ChatColor.AQUA + "[" + npc.getFullName() + " -> " + playerName + "] " + ChatColor.WHITE + response;
+                p.sendMessage(outmsg);
+            }
+        } else {
+            Plugin.log("null msg");
+        }
+        if (command != null) {
+            performCommand(playerName==null?null:plugin.getServer().getPlayer(playerName), command);
+        }
+
+    }
 
     /**
      * This is called every tick, and is where we do the work. We check the queue for messages,
@@ -244,44 +309,32 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
      */
     private void update() {
         // check the queue - if there are any messages, speak them.
-        while(!queue.isEmpty()) {
+        while (!queue.isEmpty()) {
             String s = queue.poll();
             // parse the response
+            // remove any backtick wrapping around the response.
+            if (s.startsWith("```")) {
+                s = s.substring(3, s.length() - 3);
+            }
+            // if the string starts with "json" remove it.
+            if (s.startsWith("json")) {
+                s = s.substring(4);
+            }
+            Plugin.log("JSON string is: " + s);
+            JsonElement json;
             try {
-                // remove any backtick wrapping around the response.
-                if(s.startsWith("```")){
-                    s = s.substring(3,s.length()-3);
-                }
-                // if the string starts with "json" remove it.
-                if (s.startsWith("json")) {
-                    s = s.substring(4);
-                }
-                Plugin.log("JSON string is: " + s);
-                JsonElement json = new JsonParser().parse(s);
-                JsonObject o = json.getAsJsonObject();
-                JsonElement tmp;
-                // get the response, command and player
-                tmp = o.get("response");
-                String response = (tmp==null || tmp.isJsonNull()) ? null : tmp.getAsString();
-                tmp = o.get("command");
-                String command = (tmp==null || tmp.isJsonNull()) ? null : tmp.getAsString();
-                tmp = o.get("player");
-                String playerName = (tmp==null || tmp.isJsonNull()) ? null : tmp.getAsString();
-                Plugin.log("responding to : " + playerName);
-                if (response != null) {
-                    for (Player p : getNearPlayers(20.0)) {
-                        // Plugin.log("message in queue : " + s);
-                        String outmsg = ChatColor.AQUA + "[" + npc.getFullName() + " -> " + playerName + "] " + ChatColor.WHITE + response;
-                        p.sendMessage(outmsg);
-                    }
-                } else {
-                    Plugin.log("null msg");
-                }
-                if (command != null){
-                    performCommand(plugin.getServer().getPlayer(playerName),command);
-                }
-            } catch(Exception e) {
+                json = new JsonParser().parse(s);
+            } catch (Exception e) {
                 plugin.getLogger().severe("Error parsing JSON: " + e.getMessage());
+                return;
+            }
+
+            if(json.isJsonArray()){
+                for(JsonElement je : json.getAsJsonArray()){
+                    processResponse(je);
+                }
+            } else {
+                processResponse(json);
             }
         }
         processGreet();
@@ -322,7 +375,7 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
         for (Entity e : npc.getEntity().getNearbyEntities(d, 1, d)) {
             if (e instanceof Player) {
                 Player p = (Player) e;
-                if(!CitizensAPI.getNPCRegistry().isNPC(e))
+                if (!CitizensAPI.getNPCRegistry().isNPC(e))
                     nonNPCPresent = true;
                 // now, I'm going to recycle this bit of code so we can store
                 // when we last saw a player! We only "see" a player when we try
@@ -335,13 +388,14 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
             }
         }
         // if there are no *real* players nearby, don't waste AI tokens on greeting.
-        if(nonNPCPresent)
+        if (nonNPCPresent)
             return r;
         else
             return new HashSet<>();
     }
 
     private String prevInv = "";
+
     private String getInventoryString() {
         StringBuilder sb = new StringBuilder();
         sb.append("inventory: ");
@@ -366,11 +420,12 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
 
     /**
      * Part of the environment builder - append any combat data
+     *
      * @return
      */
     private void appendCombatString(StringBuilder sb) {
         Sentinel.SentinelData d = plugin.getInstance().sentinelPlugin.makeData(npc);
-        if(d == null)
+        if (d == null)
             return;
         // first, how long ago did we see combat
         double t = d.timeSinceAttack / 20; // convert to seconds
@@ -398,16 +453,18 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
     }
 
     String prevEnv = ""; // previous weather string
+
     /**
      * Get the weather as a string preceded by "environment: " if it has changed. Return the empty string
      * otherwise
+     *
      * @return the weather as a string or empty string
      */
-    private String getEnvironmentString(){
+    private String getEnvironmentString() {
         StringBuilder sb = new StringBuilder().append("environment: ");
         World w = npc.getEntity().getLocation().getWorld();
 
-        if(npc.getEntity().getLocation().getBlock().getLightFromSky() == 0){
+        if (npc.getEntity().getLocation().getBlock().getLightFromSky() == 0) {
             sb.append("You are underground and do not know the time or weather.\n");
         } else {
 
@@ -480,13 +537,51 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
         String name = npc.getFullName();
 
         if (!prevEnv.contentEquals(sb)) {
-            plugin.getLogger().info(name+"  Env changed: " + sb);
+            plugin.getLogger().info(name + "  Env changed: " + sb);
             prevEnv = sb.toString();
             return prevEnv;
         }
-        plugin.getLogger().info(name+"  Env unchanged: " + sb);
+        plugin.getLogger().info(name + "  Env unchanged: " + sb);
         return ""; // no change
     }
+
+    /**
+     * If the chat - the link to the upstream LLM - is null, create a new one setting
+     * up the config and the system instructions. This is done when we respond to
+     * a chat event for the first time.
+     */
+    private void createChatIfNull(){
+        if (chat == null) {
+            String personaString = getPersonaString(personaName);
+            // generate the system instruction from the persona string.
+
+            Content.Builder b = Content.builder();
+            b.role("user");
+            List<Part> parts = new ArrayList<>();
+            parts.add(Part.fromText("Your name is " + npc.getFullName() + ". "));
+            parts.add(Part.fromText(STANDARD_INSTRUCTIONS));
+            parts.add(Part.fromText(personaString));
+            if(npc.hasTrait(SentinelTrait.class)){
+                parts.add(Part.fromText("You can send the 'setguard playername' command, which will make you follow and guard a player. You can also send the 'unguard' command, which will stop you following and guarding a player."));
+            }
+            b.parts(parts);
+
+            Content systemInstruction = b.build();
+
+            // add this to the config.
+            GenerateContentConfig config = GenerateContentConfig.builder()
+                    .maxOutputTokens(256)   // we want quite short, conversational responses
+                    .systemInstruction(systemInstruction)
+                    .responseMimeType("application/json")
+                    .build();
+            // create new chat with the model specified in the plugin (which comes from
+            // the configuration file).
+            chat = plugin.client.chats.create(plugin.model, config);
+            plugin.getLogger().info("NPC " + npc.getFullName() + " has been created with model " + plugin.model);
+            plugin.getLogger().info("Persona: " + personaString);
+        }
+    }
+
 
     /**
      * This is called when the NPC is spoken to. It will be called from the
@@ -499,35 +594,28 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
      * @param input  The message they sent.
      */
     public void respondTo(Player player, String input) {
-        plugin.getServer().getLogger().info(player.getName() + " has been spoken to!");
+        var l = plugin.getServer().getLogger();
+        if(player==null)
+            l.info("NPC " + npc.getFullName() + " is responding to an event");
+        else
+            l.info(player.getName() + " has been spoken to!");
 
         // if the chat session is null, we need to create it.
-        if (chat == null) {
-            String personaString = getPersonaString(personaName);
-            // generate the system instruction from the persona string.
-            Content systemInstruction = Content.fromParts(
-                    Part.fromText("Your name is " + npc.getFullName() + ". "),
-                    Part.fromText(STANDARD_INSTRUCTIONS),
-                    Part.fromText(personaString));
-            // add this to the config.
-            GenerateContentConfig config = GenerateContentConfig.builder()
-                    .maxOutputTokens(256)   // we want quite short, conversational responses
-                    .systemInstruction(systemInstruction)
-                    .build();
-            // create new chat with the model specified in the plugin (which comes from
-            // the configuration file).
-            chat = plugin.client.chats.create(plugin.model, config);
-            plugin.getLogger().info("NPC " + npc.getFullName() + " has been created with model " + plugin.model);
-            plugin.getLogger().info("Persona: " + personaString);
+        createChatIfNull();
+
+        // limit rate globally - across all chats!
+        if(plugin.eventRateTracker.getEventsInLastMinute()>20){
+            l.info("Rate limit exceeded, not responding to " + player.getDisplayName());
+            return;
         }
 
         // look for nearby players, and only do something if there are some.
-        Set<Player> q = getNearPlayers(10); // audible distance
-        plugin.getServer().getLogger().info("Players nearby :" + q);
-        if (!q.isEmpty()) {
-            String toName = ChatColor.stripColor(player.getDisplayName());
+        Set<Player> nearPlayers = getNearPlayers(10); // audible distance
+        if (!nearPlayers.isEmpty()) {
+            String toName = (player==null)?"event":ChatColor.stripColor(player.getDisplayName());
             // start a new thread which sends to the AI and waits for the result
             new Thread(() -> {
+                plugin.eventRateTracker.event();
                 // build the input string
                 StringBuilder sb = new StringBuilder();
                 sb.append("context: {\n");
@@ -553,7 +641,7 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
         }
     }
 
-    private void processGreet(){
+    private void processGreet() {
         Set<Player> players = getNearPlayers(10);
         // pick one who isn't in the "near players for greet" list - i.e. who has just turned up
         for (Player p : players) {

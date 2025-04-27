@@ -9,10 +9,13 @@ import java.nio.file.Path;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 
+import net.citizensnpcs.api.event.NPCRightClickEvent;
 import net.citizensnpcs.api.npc.NPC;
 import org.bukkit.Bukkit;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.util.Vector;
 import org.bukkit.Location;
 import org.bukkit.ChatColor;
@@ -39,6 +42,7 @@ public class Plugin extends JavaPlugin implements Listener {
     static final String ROOTCMDNAME = "gemini";
     public String model; // the model to use for Gemini AI - visible for the trait
     public Client client; // the client for the AI API - visible for the trait
+    EventRateTracker eventRateTracker = new EventRateTracker();
 
     private final Registry commandRegistry = new Registry(ROOTCMDNAME);
 
@@ -197,18 +201,6 @@ public class Plugin extends JavaPlugin implements Listener {
         return false;
     }
 
-    // given an NPC, get the GeminiNPCTrait for it.
-    public static GeminiNPCTrait getTraitFor(NPC npc) {
-        if (npc == null) {
-            return null;
-        }
-        if (npc.hasTrait(GeminiNPCTrait.class)) {
-            return npc.getOrAddTrait(GeminiNPCTrait.class);
-        }
-        return null;
-
-    }
-
     // this is a list of all the NPCs which have the trait
     Set<NPC> chatters = new HashSet<>();
 
@@ -226,10 +218,29 @@ public class Plugin extends JavaPlugin implements Listener {
         return getTraitFor(CitizensAPI.getDefaultNPCSelector().getSelected(sender));
     }
 
-    @EventHandler
-    public void onNavigationComplete(net.citizensnpcs.api.ai.event.NavigationCompleteEvent e) {
-        Bukkit.broadcastMessage("Nav complete");
+    public static GeminiNPCTrait getTraitFor(Entity e){
+        if(e instanceof Player){
+            NPC npc = CitizensAPI.getNPCRegistry().getNPC(e);
+            if(npc!=null){
+                return getTraitFor(npc);
+            }
+        }
+        return null;
     }
+
+    // given an NPC, get the GeminiNPCTrait for it.
+    public static GeminiNPCTrait getTraitFor(NPC npc) {
+        if (npc == null) {
+            return null;
+        }
+        if (npc.hasTrait(GeminiNPCTrait.class)) {
+            return npc.getOrAddTrait(GeminiNPCTrait.class);
+        }
+        return null;
+
+    }
+
+
 
     public static boolean isNear(Location a, Location b, double dist) {
         return (a.distance(b) < dist && Math.abs(a.getY() - b.getY()) < 2);
@@ -325,5 +336,14 @@ public class Plugin extends JavaPlugin implements Listener {
             GeminiNPCTrait t = getTraitFor(npc);
             c.msg(ChatColor.AQUA + npc.getName()+" : "+t.personaName);
         }
+    }
+
+    @Cmd(desc="Get general resource usage info", argc=0)
+    public void usage(CallInfo c) {
+        c.msg("GeminiNPC usage:");
+        c.msg("  Events in last minute: "+eventRateTracker.getEventsInLastMinute());
+        c.msg("  Active chatters: "+chatters.size());
+        c.msg("  Personae: "+personae.size());
+        c.msg("  NPCs with personae: "+chatters.size());
     }
 }
