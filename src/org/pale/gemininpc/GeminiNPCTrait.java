@@ -5,9 +5,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.time.Instant;
 import java.util.stream.Collectors;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.*;
 import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.ai.Navigator;
 import net.citizensnpcs.api.trait.TraitName;
@@ -33,6 +31,8 @@ import org.pale.gemininpc.plugininterfaces.Sentinel;
 import org.pale.gemininpc.waypoints.Waypoints;
 import org.pale.jcfutils.region.Region;
 import org.pale.jcfutils.region.RegionManager;
+
+import static org.pale.gemininpc.Utils.getDifferences;
 
 
 //This is your trait that will be applied to a npc using the /trait mytraitname command.
@@ -158,7 +158,7 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
      */
     @Override
     public void onDespawn() {
-        Plugin.log(" Despawn run on " + npc.getFullName());
+        // Plugin.log(" Despawn run on " + npc.getFullName());
 
         // remove this NPC from the plugin's set of NPCs which have the trait
         plugin.removeChatter(npc);
@@ -170,7 +170,7 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
      */
     @Override
     public void onSpawn() {
-        Plugin.log(" Spawn run on " + npc.getFullName());
+        // Plugin.log(" Spawn run on " + npc.getFullName());
         // Add the NPC to the plugin's set of NPCs which have the trait
         plugin.addChatter(npc);
     }
@@ -446,79 +446,71 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
             return new HashSet<>();
     }
 
-    private String prevInv = "";
-
-    private String getInventoryString() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("inventory: ");
+    /**
+     * Add the inventory as a JSON array to a JsonObject, if we are carrying anything
+     * @return JSON array
+     */
+    private void appendInventory(JsonObject root) {
+        JsonArray arr = new JsonArray();
+        boolean isempty=true;
         if (npc.getEntity() instanceof Player) {
             Player p = (Player) npc.getEntity();
             Inventory inv = p.getInventory();
             ItemStack[] items = inv.getContents();
-            sb.append("you are carrying: ");
             for (ItemStack item : items) {
                 if (item != null) {
-                    sb.append(item.getType().name()).append(" ");
+                    arr.add(item.getType().name());
+                    isempty = false;
                 }
             }
         }
-        sb.append("\n");
-        if (!prevInv.contentEquals(sb)) {
-            plugin.getLogger().info(npc.getFullName() + "  Inventory changed: " + sb);
-            prevInv = sb.toString();
-            return prevInv;
-        } else return "";
+        if(!isempty)
+            root.add("inventory",arr);
     }
 
     /**
-     * Part of the environment builder - append any combat data
-     *
-     * @return
+     * Part of the environment builder - append any combat data to a JsonObject
      */
-    private void appendCombatString(StringBuilder sb) {
+    private void appendCombatData(JsonObject root) {
         Sentinel.SentinelData d = plugin.getInstance().sentinelPlugin.makeData(npc);
         if (d == null)
             return;
         // first, how long ago did we see combat
-        double t = d.timeSinceAttack / 20; // convert to seconds
+        double t = d.timeSinceAttack / 20.0; // convert to seconds
         if (t > 60) {
-            sb.append("You have not seen combat for ").append((int) t / 60).append(" minutes.\n");
+            root.addProperty("combat", String.format("%d minutes ago", (int) t / 60));
         } else if (t > 0) {
-            sb.append("You have not seen combat for ").append((int) t).append(" seconds.\n");
+            root.addProperty("combat", String.format("%d seconds ago", (int) t));
         } else {
-            sb.append("You are in combat!\n");
+            root.addProperty("combat", "now");
         }
         // now, are we guarding someone?
-        if (d.guarding != null) {
-            sb.append("You are guarding ").append(d.guarding).append(".\n");
-        } else {
-            sb.append("You are not guarding anyone.\n");
-        }
+        if (d.guarding != null)
+            root.addProperty("guarding player", d.guarding);
         // health.
         double h = d.health;
         if (h >= 99.0) {
-            sb.append("You are at full health.\n");
+            root.addProperty("health","maximum");
         } else {
-            sb.append("You are at ").append((int) h).append("% health.\n");
+            root.addProperty("health", String.format("%d%%", (int)h));
         }
-
     }
 
-    String prevEnv = ""; // previous weather string
+    JsonObject prevContext = null;
 
     // we have to do a getNearbyEntities query in the main thread, so the trait holds onto this for use
-    // in getEnvironmentString. It also gets reused in a few places.
+    // in getContext. It also gets reused in a few places.
 
     Set<Player> nearPlayers;
 
+
+
     /**
-     * Get the weather as a string preceded by "environment: " if it has changed. Return the empty string
-     * otherwise
+     * Get the context (environment, inventory etc.) as a JSON object, leaving out unchanged elements
      *
-     * @return the weather as a string or empty string
+     * @return the context as a Json element, leaving out unchanged elements
      */
-    private String getEnvironmentString() {
-        StringBuilder sb = new StringBuilder().append("environment: ");
+    private JsonElement getContext() {
         Location loc = npc.getStoredLocation();
         World w = loc.getWorld();
 
@@ -528,14 +520,17 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
         byte blockLight = blk.getLightFromBlocks();
         byte totalLight = blk.getLightLevel();
 
+        JsonObject root = new JsonObject();
+
         if (skyLight == 0) {
-            sb.append("You are underground and do not know the time or weather.\n");
+            root.addProperty("time", "You are underground and do not know the time.");
+            root.addProperty("weather", "You are underground and do not know the weather");
         } else {
             long t = Objects.requireNonNull(w).getTime();
             int hours = (int) ((t / 1000 + 6) % 24);
             int minutes = (int) (60 * (t % 1000) / 1000);
             String timeString = String.format("%02d:%02d", hours, minutes);
-            sb.append("The time is ").append(timeString).append(". The weather is ");
+            root.addProperty("time", timeString);
 
             // I need to tell if it's snow or rain.
             // this is a really rough method - it seems pretty impossible to do it properly.
@@ -574,8 +569,7 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
                     weatherString = "raining";
                 }
             }
-            sb.append(weatherString).append(".\n");
-
+            root.addProperty("weather", weatherString);
         }
 
         // add JCFUtils region data
@@ -583,18 +577,22 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
         if (rm != null) {
             Region region = rm.getSmallestRegion(loc);
             if (region != null) {
-                sb.append("You are in region ").append(region.name).append(".\n");
+                JsonObject regionObj = new JsonObject();
+                regionObj.addProperty("name", region.name);
                 if(!region.desc.isEmpty()){
-                    sb.append("Region description: ").append(region.desc).append("\n");
+                    regionObj.addProperty("description",region.desc);
                 }
+                root.add("region", regionObj);
             }
         }
         var nearbyWp = waypoints.getNearWaypoint(loc, 100);
         if(nearbyWp!=null){
             if(nearbyWp.distanceSquared<16){
-                sb.append("You are at location "+nearbyWp.name+".\n");
+                root.addProperty("location", nearbyWp.name);
+                root.addProperty("location description", nearbyWp.waypoint.desc);
             } else {
-                sb.append("You are near location "+nearbyWp.name+".\n");
+                root.addProperty("nearby location",nearbyWp.name);
+                root.addProperty("nearby location description",nearbyWp.waypoint.desc);
             }
         }
 
@@ -602,36 +600,35 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
 
         // who is nearby?
         if(!nearPlayers.isEmpty()) {
-            sb.append("You can see these players: ");
+            JsonArray nearbyPlayers = new JsonArray();
             var st = nearPlayers.stream()
                     .map(Player::getDisplayName)
                     .map(ChatColor::stripColor);
-            var s = st.collect(Collectors.joining(" "));
-            sb.append(s+"\n");
+            for(var s : st.collect(Collectors.toList())){
+                nearbyPlayers.add(s);
+            }
+            root.add("nearbyPlayers", nearbyPlayers);
         }
 
         // light conditions?
         if(totalLight>0){
-            sb.append("The light level is ").append(totalLight);
-            sb.append("/15 of which ").append(blockLight).append(" is from lamps.\n");
+            root.addProperty("light", String.format("%d/15", totalLight));
+            root.addProperty("skylight", String.format("%d/15", skyLight));
+            root.addProperty("lamplight", String.format("%d/15", blockLight));
         } else {
-            sb.append("You are in darkness.\n");
+            root.addProperty("light", "dark");
         }
 
-
-
         // now, add the combat data if this is a Sentinel
-        appendCombatString(sb);
+        appendCombatData(root);
+        // and the inventory
+        appendInventory(root);
 
         String name = npc.getFullName();
 
-        if (!prevEnv.contentEquals(sb)) {
-            plugin.getLogger().info(name + "  Env changed: " + sb);
-            prevEnv = sb.toString();
-            return prevEnv;
-        }
-        plugin.getLogger().info(name + "  Env unchanged: " + sb);
-        return ""; // no change
+        JsonObject diffs = getDifferences(prevContext,root);
+        prevContext = root;
+        return diffs;
     }
 
     /**
@@ -721,17 +718,14 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
             // start a new thread which sends to the AI and waits for the result
             new Thread(() -> {
                 plugin.eventRateTracker.event();
-                // build the input string
-                StringBuilder sb = new StringBuilder();
-                sb.append("context: {\n");
-                sb.append(getEnvironmentString());
-                sb.append(getInventoryString());
-                sb.append("}\n");
-                sb.append("input: {\n");
-                sb.append(toName).append(": ").append(input).append("\n}\n");
 
-                plugin.getServer().getLogger().info("Sending to AI: " + sb);
-                GenerateContentResponse response = chat.sendMessage(sb.toString()); // send to AI
+                JsonObject output = new JsonObject();
+                output.add("context", getContext());
+                output.add("input", new JsonPrimitive(input));
+
+                String outString = output.toString();
+                plugin.getServer().getLogger().info("Sending to AI: " + outString);
+                GenerateContentResponse response = chat.sendMessage(outString); // send to AI
                 if (response == null) {
                     plugin.getServer().getLogger().severe("No response");
                     return;
