@@ -9,6 +9,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.citizensnpcs.api.CitizensAPI;
+import net.citizensnpcs.api.ai.Navigator;
 import net.citizensnpcs.api.trait.TraitName;
 import net.citizensnpcs.api.util.DataKey;
 
@@ -29,6 +30,7 @@ import com.google.genai.types.Part;
 import com.google.genai.types.Content;
 import org.mcmonkey.sentinel.SentinelTrait;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
+import org.pale.gemininpc.waypoints.Waypoints;
 import org.pale.jcfutils.region.Region;
 import org.pale.jcfutils.region.RegionManager;
 
@@ -82,6 +84,7 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
     Plugin plugin;           // useful pointer back to the plugin shared by all traits
     private int tickint = 0;        // a counter to slow down updates
     public long timeSpawned = 0;    // ticks since spawn
+    Location navTarget;     // current path destination using our waypoints (not Chatcitizen's) or null
 
     Map<String, Long> lastGreetedTime = new HashMap<>(); // last time we greeted a player
     Set<Player> nearPlayersForGreet = new HashSet<>(); // players nearby
@@ -102,6 +105,16 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
 
     String personaName = "default"; // the name of the persona
 
+    Waypoints waypoints = new Waypoints();
+
+    // we can set one of these up to be called when navigation completes (or fails)
+    public interface NavCompletionFunction {
+        void call(String code);
+    }
+    NavCompletionFunction navCompletionHandler;
+
+
+
     // Here you should load up any values you have previously saved (optional).
     // This does NOT get called when applying the trait for the first time, only loading onto an existing npc at server start.
     // This is called AFTER onAttach so you can load defaults in onAttach, and they will be overridden here.
@@ -109,11 +122,13 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
     public void load(DataKey key) {
         // we load the entire persona string.
         personaName = key.getString("pname", "default");
+        waypoints.load(key);
     }
 
     // Save settings for this NPC (optional). These values will be persisted to the Citizens saves file
     public void save(DataKey key) {
         key.setString("pname", personaName);
+        waypoints.save(key);
     }
 
     // Called every tick
@@ -242,7 +257,7 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
                 plugin.log("Bad material name in command: " + command);
             }
         }
-        if(command.startsWith("setguard")){
+        else if(command.startsWith("setguard")){
             if(hasSentinel){
                 String name = command.substring(9).trim();
                 if(name.equalsIgnoreCase("none")){
@@ -267,7 +282,21 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
             } else {
                 plugin.log("NPC " + npc.getFullName() + " does not have Sentinel.");
             }
+        } else if(command.startsWith("go ")){
+            String name = command.substring(3).trim();
+            if(name.equalsIgnoreCase("none")){
+                npc.getNavigator().cancelNavigation();
+                plugin.log("NPC " + npc.getFullName() + " got a 'go none'.");
+            } else {
+                try {
+                    pathTo(name);
+                    plugin.log("NPC " + npc.getFullName() + " is now going to waypoint "+name);
+                } catch(Waypoints.Exception e) {
+                    plugin.log("Cannot find waypoint: " + name);
+                }
+            }
         }
+
     }
 
     /**
@@ -338,6 +367,29 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
             }
         }
         processGreet();
+
+        // check navigation completion or timeout
+        if(navTarget!=null) {
+            Plugin.log("Checking navigation completion for "+npc.getName());
+            String navCompletionCode=null;
+            Navigator nav = npc.getNavigator();
+            if(npc.getStoredLocation().distance(navTarget) < 2){
+                // close enough!
+                nav.cancelNavigation();
+                navCompletionCode = "arrived close to destination";
+                navTarget = null;
+            } else if(!nav.isNavigating()){
+                navCompletionCode = "arrived at destination";
+                navTarget = null;
+            }
+            if(navCompletionHandler!=null && navCompletionCode!=null){
+                navCompletionHandler.call(navCompletionCode);
+                navCompletionHandler = null;
+            }
+            if(navTarget==null){
+                Plugin.log("Nav was completed");
+            }
+        }
     }
 
     private String getPersonaString(String pname) {
@@ -467,9 +519,10 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
      */
     private String getEnvironmentString() {
         StringBuilder sb = new StringBuilder().append("environment: ");
-        World w = npc.getEntity().getLocation().getWorld();
+        Location loc = npc.getStoredLocation();
+        World w = loc.getWorld();
 
-        Block blk = npc.getEntity().getLocation().getBlock();
+        Block blk = loc.getBlock();
 
         byte skyLight = blk.getLightFromSky();
         byte blockLight = blk.getLightFromBlocks();
@@ -486,10 +539,10 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
 
             // I need to tell if it's snow or rain.
             // this is a really rough method - it seems pretty impossible to do it properly.
-            Biome b = w.getBiome(npc.getEntity().getLocation());
+            Biome b = w.getBiome(loc);
             boolean isSnow = false;  // if stormy, is it snow or rain?
             // get altitude of npc
-            double y = npc.getEntity().getLocation().getY();
+            double y = loc.getY();
             switch (b) {  // ugh.
                 case FROZEN_OCEAN, DEEP_FROZEN_OCEAN, SNOWY_BEACH, SNOWY_PLAINS, SNOWY_SLOPES, SNOWY_TAIGA:
                     isSnow = true;
@@ -528,14 +581,24 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
         // add JCFUtils region data
         RegionManager rm = RegionManager.getManager(w);
         if (rm != null) {
-            Region region = rm.getSmallestRegion(npc.getEntity().getLocation());
+            Region region = rm.getSmallestRegion(loc);
             if (region != null) {
-                sb.append("You are in region ").append(region).append(".\n");
+                sb.append("You are in region ").append(region.name).append(".\n");
                 if(!region.desc.isEmpty()){
                     sb.append("Region description: ").append(region.desc).append("\n");
                 }
             }
         }
+        var nearbyWp = waypoints.getNearWaypoint(loc, 100);
+        if(nearbyWp!=null){
+            if(nearbyWp.distanceSquared<16){
+                sb.append("You are at location "+nearbyWp.name+".\n");
+            } else {
+                sb.append("You are near location "+nearbyWp.name+".\n");
+            }
+        }
+
+
 
         // who is nearby?
         if(!nearPlayers.isEmpty()) {
@@ -590,9 +653,25 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
             if(npc.hasTrait(SentinelTrait.class)){
                 parts.add(Part.fromText("You can send the 'setguard playername' command, which will make you follow and guard a player. You can also send the 'unguard' command, which will stop you following and guarding a player."));
             }
+
+            if(waypoints.getNumberOfWaypoints()>0){
+                var locs = waypoints.getWaypointNames().stream().collect(Collectors.joining(","));
+                parts.add(Part.fromText("To go to a location, use the 'go locationname' command"));
+                parts.add(Part.fromText("Locations you can go to: " + locs));
+                for(String name : waypoints.getWaypointNames()) {
+                    try {
+                        var desc = waypoints.getWaypoint(name).desc;
+                        parts.add(Part.fromText("\"" + name + "\": " + desc));
+                    } catch (Waypoints.Exception e) {
+                        plugin.getLogger().severe("Error getting waypoint description: " + e.getMessage());
+                    }
+                }
+            }
+
             b.parts(parts);
 
             Content systemInstruction = b.build();
+            Plugin.log("System instruction for "+npc.getName()+" is "+ systemInstruction.toJson());
 
             // add this to the config.
             GenerateContentConfig config = GenerateContentConfig.builder()
@@ -684,5 +763,9 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
             }
         }
         nearPlayersForGreet = players; // update the list of players we have greeted
+    }
+
+    void pathTo(String name) throws Waypoints.Exception {
+        navTarget = waypoints.pathTo(this, name);
     }
 }

@@ -28,6 +28,7 @@ import org.jetbrains.annotations.NotNull;
 import org.pale.gemininpc.Command.*;
 import org.pale.gemininpc.plugininterfaces.NPCDestinations;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
+import org.pale.gemininpc.waypoints.Waypoints;
 
 
 public class Plugin extends JavaPlugin implements Listener {
@@ -356,5 +357,65 @@ public class Plugin extends JavaPlugin implements Listener {
         c.msg("  Active chatters: "+chatters.size());
         c.msg("  Personae: "+personae.size());
         c.msg("  NPCs with personae: "+chatters.size());
+    }
+
+    @Cmd(desc="Get info on an NPC", argc=0, cz=true)
+    public void info(CallInfo c){
+        GeminiNPCTrait t = c.getCitizen();
+        c.msg("NPC "+t.getNPC().getName());
+        c.msg("  Persona: "+t.personaName);
+        c.msg("  Waypoints:");
+        for(String name:t.waypoints.getWaypointNames()) {
+            try {
+                Waypoints.Waypoint w = t.waypoints.getWaypoint(name);
+                c.msg("    " + name + " : " + w.toString());
+            } catch (Waypoints.Exception e) {
+                c.msg("    " + name + " : ERROR: " + e.getMessage());
+            }
+        }
+    }
+
+    @Cmd(desc="Set a waypoint for the current NPC at your current location", argc=-1, usage="[name] [desc..]", cz=true)
+    public void wp(CallInfo c){
+        String name = c.getArgs()[0];
+        StringBuilder sb = new StringBuilder();
+        int len = c.getArgs().length;
+        for(int i=1;i<len;i++){
+            sb.append(c.getArgs()[i]);
+            if(i<len-1)
+                sb.append(" ");
+        }
+        String desc = sb.toString();
+        GeminiNPCTrait t = c.getCitizen();
+        t.waypoints.add(name, desc, c.getPlayer().getLocation());
+        c.msg(ChatColor.AQUA+"Waypoint "+name+" added at "+
+                c.getPlayer().getLocation().getBlockX()+","+
+                c.getPlayer().getLocation().getBlockY()+","+
+                c.getPlayer().getLocation().getBlockZ());
+    }
+
+    @Cmd(desc="Delete a named waypoint", argc=1, usage="[name]", cz=true)
+    public void wpdel(CallInfo c){
+        String name = c.getArgs()[0];
+        GeminiNPCTrait t = c.getCitizen();
+        try {
+            t.waypoints.delete(name);
+        } catch (Waypoints.Exception e) {
+            c.msg(ChatColor.RED+"Waypoint path error: "+e.getMessage());
+        }
+    }
+
+    @Cmd(desc="Make an NPC path to the named waypoint", argc=1, usage="[name]", cz=true)
+    public void go(CallInfo c){
+        String name = c.getArgs()[0];
+        GeminiNPCTrait t = c.getCitizen();
+        try {
+            t.pathTo(name);
+            t.navCompletionHandler = (String s) -> {
+                c.msg(ChatColor.AQUA+"path to "+name+" completed: "+s);
+            };
+        } catch (Waypoints.Exception e) {
+            c.msg(ChatColor.RED+"Waypoint path error: "+e.getMessage());
+        }
     }
 }

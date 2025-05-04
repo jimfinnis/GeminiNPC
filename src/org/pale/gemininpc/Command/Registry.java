@@ -50,6 +50,7 @@ public class Registry {
                     return;
                 }
                 if(cmd.argc()>=0 && c.getArgs().length!=cmd.argc()){
+                    c.msg(ChatColor.RED+"Wrong number of arguments. Expected "+cmd.argc());
                     showHelp(c,c.getCmd());
                     return;
                 }
