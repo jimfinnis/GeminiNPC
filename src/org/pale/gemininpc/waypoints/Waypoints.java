@@ -2,7 +2,9 @@ package org.pale.gemininpc.waypoints;
 
 import net.citizensnpcs.api.util.DataKey;
 import org.bukkit.Location;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.pale.gemininpc.GeminiNPCTrait;
+import org.pale.gemininpc.Plugin;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -11,28 +13,6 @@ import java.util.Set;
 import static org.bukkit.Bukkit.getServer;
 
 public class Waypoints {
-    public class Waypoint {
-        int x,y,z;
-        String world;
-        public String name;
-        public String desc;    // description for use by the NPC
-        Location loc;   // used to store more detailed positions; generated automatically if not present
-
-        public Waypoint(String world, String name, String desc, int x, int y, int z) {
-            this.world = world;
-            this.name = name;
-            this.desc = desc;
-            this.x = x;
-            this.y = y;
-            this.z = z;
-            loc = new Location(getServer().getWorld(world), x+0.5, y, z+0.5);
-        }
-
-        @Override
-        public String toString(){
-            return "("+x+","+y+","+z+") "+desc;
-        }
-    }
 
     public class Exception extends java.lang.Exception {
         public Exception(String msg){
@@ -43,7 +23,7 @@ public class Waypoints {
     Map<String, Waypoint> waypoints = new HashMap<>();
 
     public void add(String name, String world, String desc, int x, int y, int z) {
-        Waypoint w = new Waypoint(world, name, desc, x,y,z);
+        Waypoint w = new Waypoint(world, name, desc, x, y, z);
         waypoints.put(name, w);
     }
 
@@ -108,8 +88,17 @@ public class Waypoints {
         Waypoint w = waypoints.get(name);
         // wonder what this does in a different world???
         if(w==null)throw new Exception("No such waypoint "+name);
-        Location loc = new Location(t.getNPC().getEntity().getWorld(), w.x+0.5, w.y, w.z+0.5);
+        final Location loc = new Location(t.getNPC().getEntity().getWorld(), w.x+0.5, w.y, w.z+0.5);
         t.getNPC().getNavigator().setTarget(loc);
+        var p = t.getNPC().getNavigator().getLocalParameters();
+        p.range((float)loc.distance(t.getNPC().getEntity().getLocation())+5.0f);
+        p.stuckAction( (npc1, navigator) -> {
+            Plugin.log("Teleporting "+npc1.getFullName()+" to waypoint "+name);
+            navigator.cancelNavigation();
+            // if we are stuck, we should just teleport to the waypoint
+            t.getNPC().teleport(loc.add(0,1,0), PlayerTeleportEvent.TeleportCause.PLUGIN);
+            return true;
+        });
         return loc;
     }
 

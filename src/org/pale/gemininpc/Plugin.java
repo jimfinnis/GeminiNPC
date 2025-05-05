@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 
 import net.citizensnpcs.api.npc.NPC;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
@@ -28,6 +29,7 @@ import org.jetbrains.annotations.NotNull;
 import org.pale.gemininpc.Command.*;
 import org.pale.gemininpc.plugininterfaces.NPCDestinations;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
+import org.pale.gemininpc.waypoints.Waypoint;
 import org.pale.gemininpc.waypoints.Waypoints;
 
 
@@ -40,6 +42,8 @@ public class Plugin extends JavaPlugin implements Listener {
     public String model; // the model to use for Gemini AI - visible for the trait
     public Client client; // the client for the AI API - visible for the trait
     EventRateTracker eventRateTracker = new EventRateTracker();
+    int sched;  // scheduler handle
+    int request_count = 0;   // AI request ctr
 
     private final Registry commandRegistry = new Registry(ROOTCMDNAME);
 
@@ -127,6 +131,23 @@ public class Plugin extends JavaPlugin implements Listener {
 
         // this is the listener for pretty much ALL events EXCEPT NPC events, not just chat.
         new ChatEventListener(this);
+
+        // let's start an update for the entire plugin. This will periodically run a special update
+        // on each trait that lets it do AI stuff without user input. Dangerous.
+        if(!Bukkit.getScheduler().isCurrentlyRunning(sched)){
+            sched = Bukkit.getScheduler().scheduleSyncRepeatingTask(this, () -> {
+                // pick a random "chatter"
+                NPC npc = chatters.stream()
+                        .skip(new Random().nextInt(chatters.size()))
+                        .findFirst().orElse(null);
+                if (npc != null) {
+                    GeminiNPCTrait t = getTraitFor(npc);
+                    if (t != null)
+                        t.updateInfrequent();
+                }
+            }, 20*60, 20*10); // every ten seconds we update one AI. Delay of 1 min before we start
+        }
+
         getLogger().info("GeminiNPC has been enabled");
     }
 
@@ -367,7 +388,7 @@ public class Plugin extends JavaPlugin implements Listener {
         c.msg("  Waypoints:");
         for(String name:t.waypoints.getWaypointNames()) {
             try {
-                Waypoints.Waypoint w = t.waypoints.getWaypoint(name);
+                Waypoint w = t.waypoints.getWaypoint(name);
                 c.msg("    " + name + " : " + w.toString());
             } catch (Waypoints.Exception e) {
                 c.msg("    " + name + " : ERROR: " + e.getMessage());
@@ -375,9 +396,13 @@ public class Plugin extends JavaPlugin implements Listener {
         }
     }
 
-    @Cmd(desc="Set a waypoint for the current NPC at your current location", argc=-1, usage="[name] [desc..]", cz=true)
-    public void wp(CallInfo c){
-        String name = c.getArgs()[0];
+    /**
+     * assuming the description starts with the second argument, concatenate remaining arguments into
+     * a single string
+     * @param c
+     * @return a single string
+     */
+    private static String getdesc(CallInfo c){
         StringBuilder sb = new StringBuilder();
         int len = c.getArgs().length;
         for(int i=1;i<len;i++){
@@ -385,9 +410,14 @@ public class Plugin extends JavaPlugin implements Listener {
             if(i<len-1)
                 sb.append(" ");
         }
-        String desc = sb.toString();
+        return sb.toString();
+    }
+
+    @Cmd(desc="Set a waypoint for the current NPC at your current location", argc=-1, usage="[name] [desc..]", cz=true)
+    public void wp(CallInfo c){
+        String name = c.getArgs()[0];
         GeminiNPCTrait t = c.getCitizen();
-        t.waypoints.add(name, desc, c.getPlayer().getLocation());
+        t.waypoints.add(name, getdesc(c), c.getPlayer().getLocation());
         c.msg(ChatColor.AQUA+"Waypoint "+name+" added at "+
                 c.getPlayer().getLocation().getBlockX()+","+
                 c.getPlayer().getLocation().getBlockY()+","+
@@ -405,17 +435,60 @@ public class Plugin extends JavaPlugin implements Listener {
         }
     }
 
+    @Cmd(desc="Change an NPC waypoint to the player's location", argc=1, usage="[name]", cz=true)
+    public void wploc(CallInfo c){
+        String name = c.getArgs()[0];
+        GeminiNPCTrait t = c.getCitizen();
+        try {
+            Waypoint wp = t.waypoints.getWaypoint(name);
+            wp.setLocation(c.getPlayer().getLocation());
+            c.msg(ChatColor.AQUA+"Waypoint "+name+" moved to "+
+                    c.getPlayer().getLocation().getBlockX()+","+
+                    c.getPlayer().getLocation().getBlockY()+","+
+                    c.getPlayer().getLocation().getBlockZ());
+        } catch (Waypoints.Exception e) {
+            c.msg(ChatColor.RED+"Waypoint error: "+e.getMessage());
+        }
+    }
+
+    @Cmd(desc="Change an NPC waypoint description", argc=-1, usage="[name] [desc...]", cz=true)
+    public void wpdesc(CallInfo c){
+        String name = c.getArgs()[0];
+        GeminiNPCTrait t = c.getCitizen();
+        try {
+            Waypoint wp = t.waypoints.getWaypoint(name);
+            wp.desc = getdesc(c);
+        } catch (Waypoints.Exception e) {
+            c.msg(ChatColor.RED+"Waypoint error: "+e.getMessage());
+        }
+    }
+
     @Cmd(desc="Make an NPC path to the named waypoint", argc=1, usage="[name]", cz=true)
     public void go(CallInfo c){
         String name = c.getArgs()[0];
         GeminiNPCTrait t = c.getCitizen();
         try {
             t.pathTo(name);
-            t.navCompletionHandler = (String s) -> {
-                c.msg(ChatColor.AQUA+"path to "+name+" completed: "+s);
+            t.navCompletionHandler = (code, dist) -> {
+                c.msg(ChatColor.AQUA+"path to "+name+" completed: "+code.label+", dist="+dist);
             };
+            c.msg("Navigating to "+name+": "+t.waypoints.getWaypoint(name).toString());
         } catch (Waypoints.Exception e) {
             c.msg(ChatColor.RED+"Waypoint path error: "+e.getMessage());
+        }
+    }
+
+    @Cmd(desc="show number of API requests made",argc=0,player=false,cz=false)
+    public void reqs(CallInfo c){
+        c.msg(ChatColor.AQUA+Integer.toString(request_count));
+    }
+
+    @Cmd(desc="toggle debugging for NPC (mainly paths)", cz=true, player=false, argc=0)
+    public void debug(CallInfo c){
+        GeminiNPCTrait t = c.getCitizen();
+        if(t!=null){
+            t.debug = !t.debug;
+            c.msg(ChatColor.AQUA+"Debugging "+t.debug+" for "+t.getNPC().getName());
         }
     }
 }

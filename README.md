@@ -48,17 +48,34 @@ This will be prepended to all the persona strings.
 Each turn, the plugin sends JSON block consisting of two elements - context and input. The latter is the actual
 string the model should respond to, the former is a JSON-like string that looks like this:
 ```
-context: {
-environment: The time is 11:35. The weather is clear.
-You are in region The Herald House.
-You are at location indoors.
-You can see these players: jfinnis
-The light level is 11/15 of which 11 is from lamps.
-inventory: you are carrying: STICK POPPY 
+{
+  "context": {
+    "time": "19:31",
+    "weather": "clear",
+    "region": {
+      "name": "The Herald House"
+    },
+    "location": "indoors",
+    "location description": "A quiet living room",
+    "nearbyPlayers": [
+      "jfinnis"
+    ],
+    "light": "11/15",
+    "skylight": "10/15",
+    "lamplight": "11/15",
+    "inventory": [
+      "STICK",
+      "POPPY"
+    ]
+  },
+  "input": "jfinnis: (enters)"       # NOTE - this is a message sent automatically when a player arrives nearby
 }
-input: {
-jfinnis: (enters)
-}```
-The environment string is the current time and weather, and the playername string is the text the player wrote.
+```
+It's worth noting that only parts of the context that have changed since the last turn are sent. So quite often
+the context will be empty or just contain the time.
 
+Most of what the context contains is obvious, but here are some notes:
 
+* `location` is a nearby waypoint name - GeminiNPC has its own waypoint system. NPCs are informed of their waypoints in the initial system instruction.
+* `location description` is a description of the waypoint.
+* `region` is information from the JCFUtils plugin's region mechanism - it gives the region name and description (if there is one).

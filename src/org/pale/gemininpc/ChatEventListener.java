@@ -1,9 +1,14 @@
 package org.pale.gemininpc;
 
+import net.citizensnpcs.api.ai.event.NavigationCancelEvent;
+import net.citizensnpcs.api.ai.event.NavigationCompleteEvent;
+import net.citizensnpcs.api.ai.event.NavigationEvent;
+import net.citizensnpcs.api.ai.event.NavigationStuckEvent;
 import net.citizensnpcs.api.event.NPCRightClickEvent;
 import net.citizensnpcs.api.npc.NPC;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -43,12 +48,7 @@ public final class ChatEventListener implements Listener {
             plugin.handleMessage(e.getPlayer(), e.getMessage());
         }
     }
-/*
-    @EventHandler
-    public void onNavigationComplete(net.citizensnpcs.api.ai.event.NavigationCompleteEvent e) {
 
-    }
-*/
     /**
      * This is the event handler for when a player right clicks on an NPC.
      *
@@ -78,6 +78,13 @@ public final class ChatEventListener implements Listener {
         Plugin.log(ChatColor.RED+"Entity damage event: " + event.getEntity().getName());
         Entity attacker = event.getDamager();
         Plugin.log("Attacker: " + attacker.getName()+" is a "+attacker.getType().name());
+        if(attacker instanceof Arrow){
+            Arrow arrow = (Arrow) attacker;
+            Plugin.log("Arrow shooter: " + attacker.getName()+" is a "+attacker.getType().name());
+            if(arrow.getShooter() instanceof Player){
+                attacker = (Entity) arrow.getShooter();
+            }
+        }
         if(attacker instanceof Player) {
             GeminiNPCTrait t = plugin.getTraitFor(attacker);
             if (t != null) {
@@ -105,6 +112,24 @@ public final class ChatEventListener implements Listener {
             GeminiNPCTrait t = damageMap.get(e);
             Plugin.log("NPC " + t.getNPC().getFullName() + " killed " + e.getName());
             t.onKill(event.getEntity().getName());
+        }
+    }
+
+    @EventHandler
+    public void navCancelled(NavigationCancelEvent e){
+        NPC npc = e.getNPC();
+        GeminiNPCTrait t = plugin.getTraitFor(npc);
+        if(t != null) {
+            t.navComplete(GeminiNPCTrait.NavCompletionCode.CANCELLED);
+        }
+    }
+
+    @EventHandler
+    public void navEnded(NavigationCompleteEvent e){
+        NPC npc = e.getNPC();
+        GeminiNPCTrait t = plugin.getTraitFor(npc);
+        if(t != null) {
+            t.navComplete(GeminiNPCTrait.NavCompletionCode.ARRIVED);
         }
     }
 }

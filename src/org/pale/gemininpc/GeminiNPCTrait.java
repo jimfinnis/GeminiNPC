@@ -8,12 +8,14 @@ import java.util.stream.Collectors;
 import com.google.gson.*;
 import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.ai.Navigator;
+import net.citizensnpcs.api.trait.Trait;
 import net.citizensnpcs.api.trait.TraitName;
 import net.citizensnpcs.api.util.DataKey;
 
 import org.bukkit.*;
 import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
+import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -40,7 +42,7 @@ import static org.pale.gemininpc.Utils.getDifferences;
 //the Trait class has a reference to the attached NPC class through the protected field 'npc' or getNPC().
 //The Trait class also implements Listener so you can add EventHandlers directly to your trait.
 @TraitName("gemininpc") // convenience annotation in recent CitizensAPI versions for specifying trait name
-public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
+public class GeminiNPCTrait extends Trait {
 
     // This string is a block of standard instructions that describe the rules of the conversation. It precedes the
     // persona string, and is used to set the context for the AI. It is sent to the AI when the chat is first
@@ -81,10 +83,22 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
         plugin = JavaPlugin.getPlugin(Plugin.class);
     }
 
+    enum NavCompletionCode {
+        ARRIVED("arrived"),
+        CANCELLED("cancelled"),
+        FAILED("failed");
+
+        public final String label;
+        private NavCompletionCode(String label){
+            this.label = label;
+        }
+    }
+
     Plugin plugin;           // useful pointer back to the plugin shared by all traits
     private int tickint = 0;        // a counter to slow down updates
     public long timeSpawned = 0;    // ticks since spawn
     Location navTarget;     // current path destination using our waypoints (not Chatcitizen's) or null
+    boolean debug;
 
     Map<String, Long> lastGreetedTime = new HashMap<>(); // last time we greeted a player
     Set<Player> nearPlayersForGreet = new HashSet<>(); // players nearby
@@ -107,11 +121,39 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
 
     Waypoints waypoints = new Waypoints();
 
+    /**
+     * This gets called very infrequently, randomly.
+     */
+    public void updateInfrequent() {
+        respondTo(null, "(looks around)");
+    }
+
     // we can set one of these up to be called when navigation completes (or fails)
     public interface NavCompletionFunction {
-        void call(String code);
+        void call(NavCompletionCode code, double dist);
     }
     NavCompletionFunction navCompletionHandler;
+
+    public void navComplete(NavCompletionCode navCompletionCode) {
+        if(navCompletionHandler != null) {
+            Navigator nav = npc.getNavigator();
+            Plugin.log("Navigator navigating:"+nav.isNavigating()+", strategydest:"+nav.getPathStrategy().getCurrentDestination());
+            double dist = npc.getStoredLocation().distance(navTarget);
+
+            navCompletionHandler.call(navCompletionCode, dist);
+            navCompletionHandler = null;
+            nav.cancelNavigation();   // just in case!
+            if(nav.getPathStrategy()!=null)
+                nav.getPathStrategy().stop();   // double just in case!
+
+            if(dist>5.0) {
+                // emergency teleport. If we didn't get there, or the system claims we got there but we're still
+                // a fair distance away, TP to it. Hate this.
+                npc.teleport(navTarget.add(0, 1, 0), PlayerTeleportEvent.TeleportCause.PLUGIN);
+            }
+            navTarget = null;
+        }
+    }
 
 
 
@@ -151,7 +193,6 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
         plugin.getServer().getLogger().info(npc.getName() + " has been assigned GeminiNPC!");
     }
 
-
     /**
      * Run code when the NPC is despawned. This is called before the entity actually despawns so
      * npc.getBukkitEntity() is still valid.
@@ -188,7 +229,7 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
      * Called by the plugin when we made a kill
      */
     void onKill(String mobname){
-        respondTo(null, "(you killed a " + mobname + ")");
+        respondTo(null, "(killed a " + mobname + ")");
     }
 
     /**
@@ -329,7 +370,6 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
         if (command != null) {
             performCommand(playerName==null?null:plugin.getServer().getPlayer(playerName), command);
         }
-
     }
 
     /**
@@ -368,26 +408,10 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
         }
         processGreet();
 
-        // check navigation completion or timeout
-        if(navTarget!=null) {
-            Plugin.log("Checking navigation completion for "+npc.getName());
-            String navCompletionCode=null;
+        if(debug){
             Navigator nav = npc.getNavigator();
-            if(npc.getStoredLocation().distance(navTarget) < 2){
-                // close enough!
-                nav.cancelNavigation();
-                navCompletionCode = "arrived close to destination";
-                navTarget = null;
-            } else if(!nav.isNavigating()){
-                navCompletionCode = "arrived at destination";
-                navTarget = null;
-            }
-            if(navCompletionHandler!=null && navCompletionCode!=null){
-                navCompletionHandler.call(navCompletionCode);
-                navCompletionHandler = null;
-            }
-            if(navTarget==null){
-                Plugin.log("Nav was completed");
+            if(nav.isNavigating()){
+                Plugin.log("Navigator navigating:"+nav.isNavigating()+", strategydest:"+nav.getPathStrategy().getCurrentDestination());
             }
         }
     }
@@ -477,6 +501,8 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
             return;
         // first, how long ago did we see combat
         double t = d.timeSinceAttack / 20.0; // convert to seconds
+        if(debug)
+            Plugin.log("Time since attack "+t);
         if (t > 60) {
             root.addProperty("combat", String.format("%d minutes ago", (int) t / 60));
         } else if (t > 0) {
@@ -668,7 +694,7 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
             b.parts(parts);
 
             Content systemInstruction = b.build();
-            Plugin.log("System instruction for "+npc.getName()+" is "+ systemInstruction.toJson());
+            // Plugin.log("System instruction for "+npc.getName()+" is "+ systemInstruction.toJson());
 
             // add this to the config.
             GenerateContentConfig config = GenerateContentConfig.builder()
@@ -679,8 +705,8 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
             // create new chat with the model specified in the plugin (which comes from
             // the configuration file).
             chat = plugin.client.chats.create(plugin.model, config);
-            plugin.getLogger().info("NPC " + npc.getFullName() + " has been created with model " + plugin.model);
-            plugin.getLogger().info("Persona: " + personaString);
+            // plugin.getLogger().info("NPC " + npc.getFullName() + " has been created with model " + plugin.model);
+            // plugin.getLogger().info("Persona: " + personaString);
         }
     }
 
@@ -693,38 +719,37 @@ public class GeminiNPCTrait extends net.citizensnpcs.api.trait.Trait {
      * makes this effectively non-blocking.
      *
      * @param player The player who spoke to the NPC.
-     * @param input  The message they sent.
+     * @param utterance  The message they sent.
      */
-    public void respondTo(Player player, String input) {
-        var l = plugin.getServer().getLogger();
-        if(player==null)
-            l.info("NPC " + npc.getFullName() + " is responding to an event");
-        else
-            l.info(player.getName() + " has been spoken to!");
-
+    public void respondTo(Player player, String utterance) {
         // if the chat session is null, we need to create it.
         createChatIfNull();
 
         // limit rate globally - across all chats!
         if(plugin.eventRateTracker.getEventsInLastMinute()>20){
-            l.info("Rate limit exceeded, not responding to " + player.getDisplayName());
+            Plugin.log("Rate limit exceeded, not responding to " + player.getDisplayName());
             return;
         }
 
         // look for nearby players, and only do something if there are some.
         nearPlayers = getNearPlayers(12); // audible distance
         if (!nearPlayers.isEmpty()) {
-            String toName = (player==null)?"event":ChatColor.stripColor(player.getDisplayName());
             // start a new thread which sends to the AI and waits for the result
             new Thread(() -> {
                 plugin.eventRateTracker.event();
-
+                String input;
+                if(player==null){
+                    input = "you: "+utterance;
+                } else {
+                    input = ChatColor.stripColor(player.getDisplayName()) + ": " + utterance;
+                }
                 JsonObject output = new JsonObject();
                 output.add("context", getContext());
                 output.add("input", new JsonPrimitive(input));
 
                 String outString = output.toString();
                 plugin.getServer().getLogger().info("Sending to AI: " + outString);
+                plugin.request_count++;
                 GenerateContentResponse response = chat.sendMessage(outString); // send to AI
                 if (response == null) {
                     plugin.getServer().getLogger().severe("No response");
