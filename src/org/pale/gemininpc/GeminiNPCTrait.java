@@ -83,6 +83,10 @@ public class GeminiNPCTrait extends Trait {
         plugin = JavaPlugin.getPlugin(Plugin.class);
     }
 
+    void log_debug(String s){
+        if(debug)Plugin.log(s);
+    }
+
     enum NavCompletionCode {
         ARRIVED("arrived"),
         CANCELLED("cancelled"),
@@ -237,12 +241,15 @@ public class GeminiNPCTrait extends Trait {
      * inventory, and the respondTo function is called with a special message.
      */
     void give(Player p) {
-        ItemStack st = p.getInventory().getItemInMainHand();
-        Material mat = st.getType();
+        ItemStack playerStack = p.getInventory().getItemInMainHand();
+        Material mat = playerStack.getType();
         if (mat == Material.AIR) return;     // nothing to take
 
+        // we only want to take one item; make a new stack of just that
+        ItemStack st = new ItemStack(mat, 1);
+
+        // we can only give to player-type npcs. For others, the item will just disappear.
         if (npc.getEntity() instanceof Player) {
-            // we can only give to player-type npcs. For others, the item will just disappear.
             // first we add to the NPC.
             Player npcp = (Player) npc.getEntity();
             Inventory inv = npcp.getInventory();
@@ -256,11 +263,11 @@ public class GeminiNPCTrait extends Trait {
 
         // we added the item to the NPC (or didn't need to), so we can remove it from the player.
         // remove from player
-        int newAmount = st.getAmount() - 1;
+        int newAmount = playerStack.getAmount() - 1;
         if (newAmount <= 0) {
             p.getInventory().setItemInMainHand(null);
         } else {
-            st.setAmount(newAmount);
+            playerStack.setAmount(newAmount);
         }
 
         // and send the message to the AI
@@ -295,7 +302,7 @@ public class GeminiNPCTrait extends Trait {
                     p.sendMessage(ChatColor.RED + npc.getFullName() + " tried to give you " + st.getType().name() + " but your inventory is full.");
                 }
             } else {
-                plugin.log("Bad material name in command: " + command);
+                log_debug("Bad material name in command: " + command);
             }
         }
         else if(command.startsWith("setguard")){
@@ -501,14 +508,13 @@ public class GeminiNPCTrait extends Trait {
             return;
         // first, how long ago did we see combat
         double t = d.timeSinceAttack / 20.0; // convert to seconds
-        if(debug)
-            Plugin.log("Time since attack "+t);
+        log_debug("Time since attack "+t);
         if (t > 60) {
             root.addProperty("combat", String.format("%d minutes ago", (int) t / 60));
         } else if (t > 0) {
             root.addProperty("combat", String.format("%d seconds ago", (int) t));
         } else {
-            root.addProperty("combat", "now");
+            root.addProperty("combat", "currently in a fight!");
         }
         // now, are we guarding someone?
         if (d.guarding != null)
@@ -694,7 +700,7 @@ public class GeminiNPCTrait extends Trait {
             b.parts(parts);
 
             Content systemInstruction = b.build();
-            // Plugin.log("System instruction for "+npc.getName()+" is "+ systemInstruction.toJson());
+            log_debug("System instruction for "+npc.getName()+" is "+ systemInstruction.toJson());
 
             // add this to the config.
             GenerateContentConfig config = GenerateContentConfig.builder()
@@ -705,8 +711,8 @@ public class GeminiNPCTrait extends Trait {
             // create new chat with the model specified in the plugin (which comes from
             // the configuration file).
             chat = plugin.client.chats.create(plugin.model, config);
-            // plugin.getLogger().info("NPC " + npc.getFullName() + " has been created with model " + plugin.model);
-            // plugin.getLogger().info("Persona: " + personaString);
+            log_debug("NPC " + npc.getFullName() + " has been created with model " + plugin.model);
+            log_debug("Persona: " + personaString);
         }
     }
 

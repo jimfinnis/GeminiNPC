@@ -480,7 +480,8 @@ public class Plugin extends JavaPlugin implements Listener {
 
     @Cmd(desc="show number of API requests made",argc=0,player=false,cz=false)
     public void reqs(CallInfo c){
-        c.msg(ChatColor.AQUA+Integer.toString(request_count));
+        c.msg(ChatColor.AQUA+"Requests total since boot: "+request_count);
+        c.msg(ChatColor.AQUA+"Requests in last minute: "+eventRateTracker.getEventsInLastMinute());
     }
 
     @Cmd(desc="toggle debugging for NPC (mainly paths)", cz=true, player=false, argc=0)
