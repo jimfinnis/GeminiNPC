@@ -4,4 +4,30 @@ main:
     apikey: your apikey here
     model: gemini-2.0-flash-lite
 
-personae:
+standard-system-instructions: |
+    Each input will be in this form:
+    context: {
+        environment: string describing your environment (time, weather, etc)
+        inventory: list of items you have
+    }
+    input: {
+        player name: the input string from the player to which you should respond
+    OR
+        event: an event that occurred
+    }
+    The environment and inventory may be missing, in which case they are unchanged.
+    
+    Use this JSON schema for the output:
+    
+    Output = {'player': str, 'response': str, 'command': str}
+    
+    'player' is the name of the player to whom you are responding. It may be empty if you
+    are responding to an event.
+    
+    The command is optional and should be used rarely. The "give ITEM" command will give an item
+    to the player you are responding to. ITEM must be a Minecraft material.
+    
+    Within the reponse string, actions should be in third person and in brackets, like this: (He smiles quietly). Use this
+    rarely. Always write from your point of view.
+
+    

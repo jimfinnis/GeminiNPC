@@ -69,6 +69,11 @@
     <version>0.4.0</version>
   </dependency>
     <dependency>
+      <groupId>io.marioslab.basis</groupId>
+      <artifactId>template</artifactId>
+      <version>1.7</version>
+    </dependency>
+    <dependency>
       <groupId>org.jetbrains</groupId>
       <artifactId>annotations</artifactId>
       <version>13.0</version>

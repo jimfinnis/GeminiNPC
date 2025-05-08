@@ -2,6 +2,9 @@
 package org.pale.gemininpc;
 
 import com.google.genai.Client;
+import io.marioslab.basis.template.Template;
+import io.marioslab.basis.template.TemplateContext;
+import io.marioslab.basis.template.TemplateLoader;
 import net.citizensnpcs.api.CitizensAPI;
 
 import java.util.*;
@@ -24,7 +27,6 @@ import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 
-
 import org.jetbrains.annotations.NotNull;
 import org.pale.gemininpc.Command.*;
 import org.pale.gemininpc.plugininterfaces.NPCDestinations;
@@ -44,6 +46,7 @@ public class Plugin extends JavaPlugin implements Listener {
     EventRateTracker eventRateTracker = new EventRateTracker();
     int sched;  // scheduler handle
     int request_count = 0;   // AI request ctr
+    boolean showSystemInstructions; // config option
 
     private final Registry commandRegistry = new Registry(ROOTCMDNAME);
 
@@ -114,7 +117,7 @@ public class Plugin extends JavaPlugin implements Listener {
         // register the commands automatically - these are tagged with @Cmd.
         commandRegistry.register(this); // register commands
 
-        // load configuration data
+        // load configuration data - this part of the config CAN'T be reloaded. Sorry.
         FileConfiguration c = this.getConfig();
         final ConfigurationSection deflt = c.getConfigurationSection("main");
         if(deflt==null)
@@ -123,8 +126,8 @@ public class Plugin extends JavaPlugin implements Listener {
         String apiKey = deflt.getString("apikey", "NOKEY");
         model = deflt.getString("model", "gemini-2.0-flash-lite");
 
-        // load the AI personae that are available
-        loadPersonae(c);
+        // loads all the config data, including personae
+        loadConfig(c);
 
         // create the gen AI API client
         client = Client.builder().apiKey(apiKey).build();
@@ -152,9 +155,51 @@ public class Plugin extends JavaPlugin implements Listener {
     }
 
     // This is a map of persona name onto the persona string loaded from each file.
-    public Map<String, String> personae = new HashMap<>();
+    public final Map<String, String> personae = new HashMap<>();
+    // This is a map of common texts used in the plugin.
+    private final Map<String, String> texts = new HashMap<>();
 
-    public void loadPersonae(FileConfiguration c) {
+    interface FileProcessor {
+        void run(String nameOfFile, String fileContents);
+    }
+    /**
+     * Given a config parameter "dirlist_name", if it exists in the configuration section,
+     * open the directory of that name and process the texts of all the files therein with
+     * a function.
+     * @param cs     configuration section
+     * @param dirListName  name of directory list element in config section
+     * @param function  function to process files through
+     */
+    public void processFilesInConfigDirectory(ConfigurationSection cs, String dirListName,
+                                              FileProcessor function){
+        List<String> dirlist = cs.getStringList(dirListName);
+        for(String s: dirlist){
+            Path p = Paths.get(s);
+            if(!p.isAbsolute()){
+                p = Paths.get(getServer().getWorldContainer().getAbsolutePath(),s);
+            }
+            if(!p.toFile().exists()){
+                warn(dirListName+" directory "+s+" does not exist");
+            } else {
+                log(dirListName+" directory: "+p.toString());
+            }
+            try {
+                Files.list(p).forEach(f -> {
+                    String name = f.getFileName().toString();
+                    try {
+                        String data = Files.readString(f);
+                        function.run(name, data);
+                    } catch (Exception e) {
+                        warn("File error " + f);
+                    }
+                });
+            } catch (Exception e) {
+                warn("CANNOT READ " + s);
+            }
+        }
+    }
+
+    public void loadConfig(FileConfiguration c) {
         // load all of the personae - these are name:filename pairs, paths relative
         // to the Minecraft server directory. Each file contains a set of system
         // instructions for the AI.
@@ -162,7 +207,7 @@ public class Plugin extends JavaPlugin implements Listener {
         // and prepend to the data for each persona.
         ConfigurationSection ps = c.getConfigurationSection("main");
         String common = Objects.requireNonNull(ps).getString("common", "");
-        if(!common.isEmpty()){
+        if (!common.isEmpty()) {
             try {
                 Path p = Paths.get(common);
                 common = Files.readString(p);
@@ -172,37 +217,56 @@ public class Plugin extends JavaPlugin implements Listener {
             }
         }
         log("Common persona data is " + common.length() + " chars");
-        List<String> ss = c.getStringList("persona-directories");
-        if(ss!=null){
-            for(String s:ss){
-                Path p = Paths.get(s);
-                if(!p.isAbsolute()){
-                    p = Paths.get(getServer().getWorldContainer().getAbsolutePath(),s);
-                }
-                if(!p.toFile().exists()){
-                    warn("Persona directory "+s+" does not exist");
-                } else {
-                    log("Persona directory is "+p.toString());
-                }
-                // get all the files in the directory
-                try {
-                    String finalCommon = common;
-                    Files.list(p).forEach(f -> {
-                        String name = f.getFileName().toString();
-                        try {
-                            String data = Files.readString(f);
-                            personae.put(name, finalCommon + "\n" + data);
-                            log("Loaded persona : " + name);
-                        } catch (Exception e) {
-                            warn("CANNOT READ PERSONA " + name);
-                        }
-                    });
-                } catch (Exception e) {
-                    warn("CANNOT READ PERSONA DIRECTORY " + s);
+
+        // various flags and that
+        showSystemInstructions = ps.getBoolean("show-system-instructions", false);
+
+        // now load the special template items - these are texts that used as tags in the persona data
+
+        Map<String, String> templateValues = new HashMap<>();
+        processFilesInConfigDirectory(c, "template-value-directories",
+                templateValues::put);
+
+        // and load the personae, using the template values
+        final String commonFinal = common;
+        processFilesInConfigDirectory(c, "persona-directories",
+                (name, data) -> {
+                    // the doc advises creating a new context each time!
+                    TemplateContext tc = new TemplateContext();
+                    for (String key : templateValues.keySet()) {
+                        tc.set(key, templateValues.get(key));
+                    }
+                    // this seems cumbersome - we just want to run the templating engine on
+                    // the data. Note that we're prepending the common text first, so the template
+                    // engine can run on that!
+                    TemplateLoader.MapTemplateLoader tl = new TemplateLoader.MapTemplateLoader();
+                    tl.set("data", commonFinal+"\n"+data);
+                    Template t = tl.load("data"); // ffs
+                    personae.put(name, t.render(tc));
+                });
+
+        // finally pull in the common texts, which are in the "texts" section.
+        ConfigurationSection cs = c.getConfigurationSection("texts");
+        if (cs != null) {
+            for (String key : cs.getKeys(false)) {
+                String value = cs.getString(key);
+                if (value != null) {
+                    texts.put(key, value);
                 }
             }
+        }
+    }
+
+    /**
+     * Return one of the standard texts, or "text-.." if it's not found
+     * @param name
+     */
+    public String getText(String name){
+        if (texts.containsKey(name)) {
+            return texts.get(name);
         } else {
-            log("No persona directories in config");
+            getLogger().severe("Cannot find text: "+name);
+            return "TEXT-" + name;
         }
     }
 
@@ -344,13 +408,19 @@ public class Plugin extends JavaPlugin implements Listener {
         }
     }
 
-    @Cmd(desc = "reload all personae (will reinitialise all chats)", argc = 0)
+    @Cmd(desc = "reload all config data and personae (will reinitialise all chats)", argc = 0)
     public void reload(CallInfo c) {
         reloadConfig();
         FileConfiguration cc = this.getConfig();
-        loadPersonae(cc);
+        loadConfig(cc);
         for (String name : personae.keySet()) {
             c.msg("Loaded " + ChatColor.AQUA + " " + name);
+        }
+
+        // reinit
+        for(NPC npc: chatters){
+            GeminiNPCTrait t = getTraitFor(npc);
+            t.reset();
         }
     }
 

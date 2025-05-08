@@ -43,38 +43,6 @@ import static org.pale.gemininpc.Utils.getDifferences;
 //The Trait class also implements Listener so you can add EventHandlers directly to your trait.
 @TraitName("gemininpc") // convenience annotation in recent CitizensAPI versions for specifying trait name
 public class GeminiNPCTrait extends Trait {
-
-    // This string is a block of standard instructions that describe the rules of the conversation. It precedes the
-    // persona string, and is used to set the context for the AI. It is sent to the AI when the chat is first
-    // created.
-    static final String STANDARD_INSTRUCTIONS =
-            """
-                    Each input will be in this form:
-                    context: {
-                        environment: string describing your environment (time, weather, etc)
-                        inventory: list of items you have
-                    }
-                    input: {
-                        player name: the input string from the player to which you should respond
-                        OR
-                        event: an event that occurred
-                    }
-                    The environment and inventory may be missing, in which case they are unchanged.
-                    
-                    Use this JSON schema for the output:
-                    
-                        Output = {'player': str, 'response': str, 'command': str}
-                    
-                    'player' is the name of the player to whom you are responding. It may be empty if you
-                    are responding to an event.
-                    
-                    The command is optional and should be used rarely. The "give ITEM" command will give an item
-                    to the player you are responding to. ITEM must be a Minecraft material.
-                    
-                    Within the reponse string, actions should be in third person and in brackets, like this: (He smiles quietly). Use this
-                    rarely. Always write from your point of view.
-                    """;//.replaceAll("[\\t\\n\\r]+"," ");
-
     /**
      * Initialise the trait.
      */
@@ -129,7 +97,7 @@ public class GeminiNPCTrait extends Trait {
      * This gets called very infrequently, randomly.
      */
     public void updateInfrequent() {
-        respondTo(null, "(looks around)");
+        respondTo(null, "(you look around)");
     }
 
     // we can set one of these up to be called when navigation completes (or fails)
@@ -233,7 +201,7 @@ public class GeminiNPCTrait extends Trait {
      * Called by the plugin when we made a kill
      */
     void onKill(String mobname){
-        respondTo(null, "(killed a " + mobname + ")");
+        respondTo(null, "(you killed a " + mobname + ")");
     }
 
     /**
@@ -514,7 +482,7 @@ public class GeminiNPCTrait extends Trait {
         } else if (t > 0) {
             root.addProperty("combat", String.format("%d seconds ago", (int) t));
         } else {
-            root.addProperty("combat", "currently in a fight!");
+            root.addProperty("combat", plugin.getText("in-combat-now"));
         }
         // now, are we guarding someone?
         if (d.guarding != null)
@@ -555,8 +523,8 @@ public class GeminiNPCTrait extends Trait {
         JsonObject root = new JsonObject();
 
         if (skyLight == 0) {
-            root.addProperty("time", "You are underground and do not know the time.");
-            root.addProperty("weather", "You are underground and do not know the weather");
+            root.addProperty("time", plugin.getText("no-skylight-time"));
+            root.addProperty("weather", plugin.getText("no-skylight-weather"));
         } else {
             long t = Objects.requireNonNull(w).getTime();
             int hours = (int) ((t / 1000 + 6) % 24);
@@ -662,6 +630,11 @@ public class GeminiNPCTrait extends Trait {
         prevContext = root;
         return diffs;
     }
+    
+    // no sniggering at the back there. This gets a part from a text defined in the config.
+    private Part getPartFromText(String textName){
+        return Part.fromText(plugin.getText(textName));
+    }
 
     /**
      * If the chat - the link to the upstream LLM - is null, create a new one setting
@@ -677,16 +650,16 @@ public class GeminiNPCTrait extends Trait {
             b.role("user");
             List<Part> parts = new ArrayList<>();
             parts.add(Part.fromText("Your name is " + npc.getFullName() + ". "));
-            parts.add(Part.fromText(STANDARD_INSTRUCTIONS));
+            parts.add(getPartFromText("standard-system-instructions"));
             parts.add(Part.fromText(personaString));
             if(npc.hasTrait(SentinelTrait.class)){
-                parts.add(Part.fromText("You can send the 'setguard playername' command, which will make you follow and guard a player. You can also send the 'unguard' command, which will stop you following and guarding a player."));
+                parts.add(getPartFromText("sentinel-instruction"));
             }
 
             if(waypoints.getNumberOfWaypoints()>0){
                 var locs = waypoints.getWaypointNames().stream().collect(Collectors.joining(","));
-                parts.add(Part.fromText("To go to a location, use the 'go locationname' command"));
-                parts.add(Part.fromText("Locations you can go to: " + locs));
+                parts.add(getPartFromText("go-instruction"));
+                parts.add(Part.fromText(plugin.getText("location-list-start") + locs));
                 for(String name : waypoints.getWaypointNames()) {
                     try {
                         var desc = waypoints.getWaypoint(name).desc;
@@ -700,7 +673,8 @@ public class GeminiNPCTrait extends Trait {
             b.parts(parts);
 
             Content systemInstruction = b.build();
-            log_debug("System instruction for "+npc.getName()+" is "+ systemInstruction.toJson());
+            if(plugin.showSystemInstructions)
+                plugin.log("System instruction for "+npc.getName()+" is "+ systemInstruction.toJson());
 
             // add this to the config.
             GenerateContentConfig config = GenerateContentConfig.builder()
@@ -745,7 +719,7 @@ public class GeminiNPCTrait extends Trait {
                 plugin.eventRateTracker.event();
                 String input;
                 if(player==null){
-                    input = "you: "+utterance;
+                    input = "event: "+utterance;
                 } else {
                     input = ChatColor.stripColor(player.getDisplayName()) + ": " + utterance;
                 }
@@ -792,5 +766,16 @@ public class GeminiNPCTrait extends Trait {
 
     void pathTo(String name) throws Waypoints.Exception {
         navTarget = waypoints.pathTo(this, name);
+    }
+
+    /**
+     * Destroy any existing chat session, forcing a reinitialise and complete local
+     * memory loss!
+     */
+    void reset(){
+        if(chat!=null){
+            chat = null;
+            prevContext = null;
+        }
     }
 }

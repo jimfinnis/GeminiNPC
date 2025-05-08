@@ -1,4 +1,18 @@
-# Google Gemini AI client for Minecraft.
+# Google Gemini AI client trait for Citizens2 in Minecraft
+
+Have conversations with NPCs using the Gemini AI model. This plugin
+uses the Gemini API to provide a conversational interface for NPCs
+in Minecraft. It is designed to be used with the Citizens2 plugin.
+
+Each NPC can have a different persona, and the plugin will send
+context information to the model to help it generate appropriate
+responses. The plugin is designed to be used with the JCFUtils
+plugin, which provides a way to get information about regions in the world.
+
+It can also interface with the Sentinel trait, so you can tell the NPC 
+to guard particular players and follow them.
+
+## Setup
 
 First, you'll need to set the model you want to use and the API key
 in the config file. See the Gemini docs for more info.
@@ -33,6 +47,8 @@ in life.
 
 If you talk to the bot after assigning the trait but before setting its persona, you'll get the rather
 bland default persona.
+
+### Common data
 
 Common data to all personae - perhaps describing the setting - can be added by putting a "common" file in the 
 main section:
