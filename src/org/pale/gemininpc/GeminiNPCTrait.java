@@ -72,6 +72,12 @@ public class GeminiNPCTrait extends Trait {
     Location navTarget;     // current path destination using our waypoints (not Chatcitizen's) or null
     boolean debug;
 
+    // So, tell me who hurt you? And when?
+
+    Entity whoDamagedBy;
+    long whenLastDamaged = -1; // -1 is never damaged or too long ago to care about
+
+
     Map<String, Long> lastGreetedTime = new HashMap<>(); // last time we greeted a player
     Set<Player> nearPlayersForGreet = new HashSet<>(); // players nearby
 
@@ -201,7 +207,15 @@ public class GeminiNPCTrait extends Trait {
      * Called by the plugin when we made a kill
      */
     void onKill(String mobname){
-        respondTo(null, "(you killed a " + mobname + ")");
+        respondTo(null, String.format("(%s killed a %s)", npc.getFullName(), mobname));
+    }
+
+    /**
+     * Called when we get damage from entity
+     */
+    void onDamagedEntity(Entity defender){
+        whoDamagedBy = defender;
+        whenLastDamaged = System.currentTimeMillis();
     }
 
     /**
@@ -423,7 +437,7 @@ public class GeminiNPCTrait extends Trait {
         boolean nonNPCPresent = false;
         // note the 1 - we have to be roughly on the same level, AND we have to be able to see them.
         // Actually, we check to see if they can see *us*.
-        for (Entity e : npc.getEntity().getNearbyEntities(d, 1, d)) {
+        for (Entity e : npc.getEntity().getNearbyEntities(d, 2, d)) {
             if (e instanceof Player) {
                 Player p = (Player) e;
                 if (!CitizensAPI.getNPCRegistry().isNPC(e))
@@ -467,32 +481,47 @@ public class GeminiNPCTrait extends Trait {
             root.add("inventory",arr);
     }
 
+
+
     /**
      * Part of the environment builder - append any combat data to a JsonObject
      */
     private void appendCombatData(JsonObject root) {
         Sentinel.SentinelData d = plugin.getInstance().sentinelPlugin.makeData(npc);
-        if (d == null)
-            return;
-        // first, how long ago did we see combat
-        double t = d.timeSinceAttack / 20.0; // convert to seconds
-        log_debug("Time since attack "+t);
-        if (t > 60) {
-            root.addProperty("combat", String.format("%d minutes ago", (int) t / 60));
-        } else if (t > 0) {
-            root.addProperty("combat", String.format("%d seconds ago", (int) t));
-        } else {
-            root.addProperty("combat", plugin.getText("in-combat-now"));
+
+        if(whenLastDamaged >= 0){
+            // was this longer ago than a given duration?
+            long lastDamageTime = (System.currentTimeMillis()-whenLastDamaged)/1000;
+            if(lastDamageTime > plugin.attackNotificationDuration){
+                whenLastDamaged = -1;
+                root.addProperty("attacked", String.format("%s has not been attacked recently.",getNPC().getName()));
+            } else {
+                root.addProperty("attacked", String.format("%s was recently attacked by %s",
+                        getNPC().getName(), whoDamagedBy.getName()));
+            }
         }
-        // now, are we guarding someone?
-        if (d.guarding != null)
-            root.addProperty("guarding player", d.guarding);
-        // health.
-        double h = d.health;
-        if (h >= 99.0) {
-            root.addProperty("health","maximum");
-        } else {
-            root.addProperty("health", String.format("%d%%", (int)h));
+
+        if (d != null) {
+            // first, how long ago did we see combat
+            double t = d.timeSinceAttack / 20.0; // convert to seconds
+            log_debug("Time since attack " + t);
+            if (t > 60) {
+                root.addProperty("combat", String.format("%d minutes ago", (int) t / 60));
+            } else if (t > 0) {
+                root.addProperty("combat", String.format("%d seconds ago", (int) t));
+            } else {
+                root.addProperty("combat", plugin.getText("in-combat-now"));
+            }
+            // now, are we guarding someone?
+            if (d.guarding != null)
+                root.addProperty("guarding player", d.guarding);
+            // health.
+            double h = d.health;
+            if (h >= 99.0) {
+                root.addProperty("health", "maximum");
+            } else {
+                root.addProperty("health", String.format("%d%%", (int) h));
+            }
         }
     }
 
@@ -619,7 +648,7 @@ public class GeminiNPCTrait extends Trait {
             root.addProperty("light", "dark");
         }
 
-        // now, add the combat data if this is a Sentinel
+        // now, add the combat data - extra data will also be added if this is a Sentinel
         appendCombatData(root);
         // and the inventory
         appendInventory(root);
@@ -708,6 +737,11 @@ public class GeminiNPCTrait extends Trait {
         // limit rate globally - across all chats!
         if(plugin.eventRateTracker.getEventsInLastMinute()>20){
             Plugin.log("Rate limit exceeded, not responding to " + player.getDisplayName());
+            return;
+        }
+
+        if(!plugin.callsEnabled) {
+            plugin.getServer().getLogger().warning("AI model calls are disabled");
             return;
         }
 

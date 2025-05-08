@@ -47,6 +47,8 @@ public class Plugin extends JavaPlugin implements Listener {
     int sched;  // scheduler handle
     int request_count = 0;   // AI request ctr
     boolean showSystemInstructions; // config option
+    int attackNotificationDuration; // config option - how many seconds does the "you have been attacked by.." last
+    boolean callsEnabled = true;    // use to disable calls to Gemini LLM model
 
     private final Registry commandRegistry = new Registry(ROOTCMDNAME);
 
@@ -220,6 +222,7 @@ public class Plugin extends JavaPlugin implements Listener {
 
         // various flags and that
         showSystemInstructions = ps.getBoolean("show-system-instructions", false);
+        attackNotificationDuration = ps.getInt("attack-notification-duration", 20);
 
         // now load the special template items - these are texts that used as tags in the persona data
 
@@ -339,7 +342,7 @@ public class Plugin extends JavaPlugin implements Listener {
 
 
 
-    public static boolean isNear(Location a, Location b, double dist) {
+    public static boolean isNear(Location a, Location b, double dist, double ydist) {
         return (a.distance(b) < dist && Math.abs(a.getY() - b.getY()) < 2);
     }
 
@@ -357,10 +360,10 @@ public class Plugin extends JavaPlugin implements Listener {
         Vector playerpos = playerloc.toVector();
         Vector playerdir = playerloc.getDirection().normalize();
         for (NPC npc : chatters) {
-            Location npcl = npc.getEntity().getLocation();
-            Vector npcpos = npcl.toVector();
+            Location npc_location = npc.getEntity().getLocation();
+            Vector npcpos = npc_location.toVector();
             if (npc.hasTrait(GeminiNPCTrait.class)) {
-                if (isNear(playerloc, npcl, 5)) { // chatters assume <5m and you're talking to them.
+                if (isNear(playerloc, npc_location, 5, 3)) { // chatters assume <5m and you're talking to them.
                     Vector tonpc = npcpos.subtract(playerpos).normalize();
                     // dot prod of facing vector and vector to player
                     double dot = tonpc.dot(playerdir);
@@ -562,4 +565,17 @@ public class Plugin extends JavaPlugin implements Listener {
             c.msg(ChatColor.AQUA+"Debugging "+t.debug+" for "+t.getNPC().getName());
         }
     }
+
+    @Cmd(desc="temporarily disable calls to the AI model",player=false,cz=false,argc=0)
+    public void disable(CallInfo c){
+        c.msg(ChatColor.AQUA+"Disabling AI model calls");
+        callsEnabled = false;
+    }
+
+    @Cmd(desc="enable calls to the AI model",player=false,cz=false,argc=0)
+    public void enable(CallInfo c){
+        c.msg(ChatColor.AQUA+"Enable AI model calls");
+        callsEnabled = true;
+    }
+
 }

@@ -18,6 +18,7 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -71,27 +72,41 @@ public final class ChatEventListener implements Listener {
     // of our NPCs, so I'm going to try to track the last damager. It might
     // be possible in more recent versions of Bukkit using getDamageSource.
 
-    Map<Entity, GeminiNPCTrait> damageMap = new HashMap<>();
+    // I'll also track who each NPC damaged and when
+    Map<Entity, GeminiNPCTrait> damageMap = new HashMap<>();    // for a given mob, who damaged it?
 
     @EventHandler
     public void onEntityDamage(EntityDamageByEntityEvent event){
         Plugin.log(ChatColor.RED+"Entity damage event: " + event.getEntity().getName());
         Entity attacker = event.getDamager();
+        Entity defender = event.getEntity();
         Plugin.log("Attacker: " + attacker.getName()+" is a "+attacker.getType().name());
+        // if an entity is shot, the attacker is actually the arrow - change that to the entity
+        // that fired it.
         if(attacker instanceof Arrow){
             Arrow arrow = (Arrow) attacker;
             Plugin.log("Arrow shooter: " + attacker.getName()+" is a "+attacker.getType().name());
-            if(arrow.getShooter() instanceof Player){
+            if(arrow.getShooter() instanceof Entity){
                 attacker = (Entity) arrow.getShooter();
             }
         }
+        // if the attacker is a player, we need to check if it's one of our NPCs and note it.
         if(attacker instanceof Player) {
             GeminiNPCTrait t = plugin.getTraitFor(attacker);
             if (t != null) {
-                Plugin.log("NPC " + t.getNPC().getFullName() + " damaged " + event.getEntity().getName());
+                Plugin.log("NPC " + t.getNPC().getFullName() + " damaged " + defender.getName());
                 // at this point we know that one of our NPCs attacked. We can assume that it will be
                 // responsible for any subsequent death.
-                damageMap.put(event.getEntity(), t);
+                damageMap.put(defender, t);
+            }
+        }
+        // if the attacker is a mob, is the defender one of our NPCs?
+        if(defender instanceof Player) {
+            GeminiNPCTrait t = plugin.getTraitFor(defender);
+            if (t != null) {
+                Plugin.log("NPC " + t.getNPC().getFullName() + " damaged by " + attacker.getName());
+                // at this point we know that one of our NPCs was attacked.
+                t.onDamagedEntity(attacker);
             }
         }
     }
