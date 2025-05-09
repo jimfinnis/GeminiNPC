@@ -3,7 +3,7 @@ package org.pale.gemininpc;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.time.Instant;
-import java.util.stream.Collectors;
+import java.util.concurrent.ThreadLocalRandom;
 
 import com.google.gson.*;
 import net.citizensnpcs.api.CitizensAPI;
@@ -12,9 +12,11 @@ import net.citizensnpcs.api.trait.Trait;
 import net.citizensnpcs.api.trait.TraitName;
 import net.citizensnpcs.api.util.DataKey;
 
+import net.citizensnpcs.nms.v1_17_R1.entity.AxolotlController;
 import org.bukkit.*;
 import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
+import org.bukkit.entity.Monster;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -57,11 +59,10 @@ public class GeminiNPCTrait extends Trait {
 
     enum NavCompletionCode {
         ARRIVED("arrived"),
-        CANCELLED("cancelled"),
-        FAILED("failed");
+        CANCELLED("cancelled");
 
         public final String label;
-        private NavCompletionCode(String label){
+        NavCompletionCode(String label){
             this.label = label;
         }
     }
@@ -77,6 +78,22 @@ public class GeminiNPCTrait extends Trait {
     Entity whoDamagedBy;
     long whenLastDamaged = -1; // -1 is never damaged or too long ago to care about
 
+    // these could be the same. If the visible monster is null, there's no visible monster - but one can be "heard"
+    Entity nearestMonster = null;
+    Entity nearestVisibleMonster = null;
+    double nearestMonsterDist = 0;
+    double nearestVisibleMonsterDist = 0;
+
+    // range of entity scanner
+    static final double NEARBY_ENTITIES_SCAN_DIST = 10;
+    static final double NEARBY_ENTITIES_SCAN_DISTY = 4;
+
+    // distances at which NPCs notice bystander players and NPCs (i.e. data about them
+    // is sent to the AI)
+    static final double VERY_CLOSE_PLAYERS_DIST = 6;
+    static final double VERY_CLOSE_PLAYERS_DISTY = 3;
+
+    static final int MAXTICKINT = 10;   // how many ticks it takes before an update
 
     Map<String, Long> lastGreetedTime = new HashMap<>(); // last time we greeted a player
     Set<Player> nearPlayersForGreet = new HashSet<>(); // players nearby
@@ -107,12 +124,12 @@ public class GeminiNPCTrait extends Trait {
     }
 
     // we can set one of these up to be called when navigation completes (or fails)
-    public interface NavCompletionFunction {
+    interface NavCompletionFunction {
         void call(NavCompletionCode code, double dist);
     }
     NavCompletionFunction navCompletionHandler;
 
-    public void navComplete(NavCompletionCode navCompletionCode) {
+    void navComplete(NavCompletionCode navCompletionCode) {
         if(navCompletionHandler != null) {
             Navigator nav = npc.getNavigator();
             Plugin.log("Navigator navigating:"+nav.isNavigating()+", strategydest:"+nav.getPathStrategy().getCurrentDestination());
@@ -154,7 +171,7 @@ public class GeminiNPCTrait extends Trait {
     // Called every tick
     @Override
     public void run() {
-        if (tickint++ == 10) { // to reduce CPU usage - this is about 0.5Hz.
+        if (tickint++ == MAXTICKINT) { // to reduce CPU usage - this is about 0.5Hz.
             update();
             tickint = 0;
         }
@@ -192,6 +209,7 @@ public class GeminiNPCTrait extends Trait {
         // Plugin.log(" Spawn run on " + npc.getFullName());
         // Add the NPC to the plugin's set of NPCs which have the trait
         plugin.addChatter(npc);
+        tickint = ThreadLocalRandom.current().nextInt(0, MAXTICKINT); // randomise the tickint to avoid all NPCs updating at once
     }
 
     /**
@@ -231,9 +249,8 @@ public class GeminiNPCTrait extends Trait {
         ItemStack st = new ItemStack(mat, 1);
 
         // we can only give to player-type npcs. For others, the item will just disappear.
-        if (npc.getEntity() instanceof Player) {
+        if (npc.getEntity() instanceof Player npcp) {
             // first we add to the NPC.
-            Player npcp = (Player) npc.getEntity();
             Inventory inv = npcp.getInventory();
             HashMap<Integer, ItemStack> leftover = inv.addItem(st);
             if (!leftover.isEmpty()) {
@@ -264,7 +281,7 @@ public class GeminiNPCTrait extends Trait {
      */
     private void performCommand(Player p, String command) {
         boolean hasSentinel = npc.hasTrait(SentinelTrait.class);
-        Sentinel s = plugin.getInstance().sentinelPlugin;
+        Sentinel s = Plugin.getInstance().sentinelPlugin;
         if (command.startsWith("give ")) {
             String mname = command.substring(5).toUpperCase().trim().replaceAll(" ", "_");
             Material mat = Material.getMaterial(mname);
@@ -275,8 +292,7 @@ public class GeminiNPCTrait extends Trait {
                     // we added the item to the player
                     p.sendMessage(ChatColor.AQUA + npc.getFullName() + " gives you " + st.getType().name());
                     // if the npc has one, remove it
-                    if (npc.getEntity() instanceof Player) {
-                        Player npcp = (Player) npc.getEntity();
+                    if (npc.getEntity() instanceof Player npcp) {
                         Inventory inv = npcp.getInventory();
                         inv.removeItem(st);
                     }
@@ -292,37 +308,37 @@ public class GeminiNPCTrait extends Trait {
                 String name = command.substring(9).trim();
                 if(name.equalsIgnoreCase("none")){
                     s.setGuard(npc, null);
-                    plugin.log("NPC " + npc.getFullName() + " unguarded.");
+                    Plugin.log("NPC " + npc.getFullName() + " unguarded.");
                 } else {
                     Player p2 = plugin.getServer().getPlayer(name);
                     if(p2 != null) {
                         s.setGuard(npc, p2.getUniqueId());
-                        plugin.log("NPC " + npc.getFullName() + " is now guarding " + p2.getDisplayName());
+                        Plugin.log("NPC " + npc.getFullName() + " is now guarding " + p2.getDisplayName());
                     } else {
-                        plugin.log("Cannot find player to guard: " + name);
+                        Plugin.log("Cannot find player to guard: " + name);
                     }
                 }
             } else {
-                plugin.log("NPC " + npc.getFullName() + " does not have Sentinel.");
+                Plugin.log("NPC " + npc.getFullName() + " does not have Sentinel.");
             }
         } else if(command.startsWith("unguard")){
             if(hasSentinel){
                 s.setGuard(npc, null);
-                plugin.log("NPC " + npc.getFullName() + " unguarded.");
+                Plugin.log("NPC " + npc.getFullName() + " unguarded.");
             } else {
-                plugin.log("NPC " + npc.getFullName() + " does not have Sentinel.");
+                Plugin.log("NPC " + npc.getFullName() + " does not have Sentinel.");
             }
         } else if(command.startsWith("go ")){
             String name = command.substring(3).trim();
             if(name.equalsIgnoreCase("none")){
                 npc.getNavigator().cancelNavigation();
-                plugin.log("NPC " + npc.getFullName() + " got a 'go none'.");
+                Plugin.log("NPC " + npc.getFullName() + " got a 'go none'.");
             } else {
                 try {
                     pathTo(name);
-                    plugin.log("NPC " + npc.getFullName() + " is now going to waypoint "+name);
+                    Plugin.log("NPC " + npc.getFullName() + " is now going to waypoint "+name);
                 } catch(Waypoints.Exception e) {
-                    plugin.log("Cannot find waypoint: " + name);
+                    Plugin.log("Cannot find waypoint: " + name);
                 }
             }
         }
@@ -344,14 +360,14 @@ public class GeminiNPCTrait extends Trait {
         String playerName = (tmp == null || tmp.isJsonNull()) ? null : tmp.getAsString();
         Plugin.log("responding to : " + playerName);
         if (response != null) {
-            for (Player p : getNearPlayers(20.0)) {
+            for (NearbyPlayer p : nearbyPlayers) {
                 // Plugin.log("message in queue : " + s);
                 String outmsg;
                 if(playerName==null || playerName.isEmpty())
                     outmsg = ChatColor.AQUA + "[" + npc.getFullName() + "] " + ChatColor.WHITE + response;
                 else
                     outmsg = ChatColor.AQUA + "[" + npc.getFullName() + " -> " + playerName + "] " + ChatColor.WHITE + response;
-                p.sendMessage(outmsg);
+                p.p.sendMessage(outmsg);
             }
         } else {
             Plugin.log("null msg");
@@ -381,7 +397,7 @@ public class GeminiNPCTrait extends Trait {
             Plugin.log("JSON string is: " + s);
             JsonElement json;
             try {
-                json = new JsonParser().parse(s);
+                json = JsonParser.parseString(s);
             } catch (Exception e) {
                 plugin.getLogger().severe("Error parsing JSON: " + e.getMessage());
                 return;
@@ -395,6 +411,8 @@ public class GeminiNPCTrait extends Trait {
                 processResponse(json);
             }
         }
+
+        updateNearbyEntities(NEARBY_ENTITIES_SCAN_DIST, NEARBY_ENTITIES_SCAN_DISTY);
         processGreet();
 
         if(debug){
@@ -420,54 +438,97 @@ public class GeminiNPCTrait extends Trait {
         chat = null; // a new chat will need to be made.
     }
 
-
     /**
      * Time at which we last saw a player, given their nick. Yes, you
      * can disguise yourself by changing nick.
      */
     Map<String, Instant> playerLastSawTime = new HashMap<>();
 
+
+    record NearbyPlayer(Player p,   // player
+                        double d,   // distance in x and z
+                        double dy   // distance in y
+    ){}
+    final Set<NearbyPlayer> emptySet  = new HashSet<>(); // avoids reinstantiations
     /**
-     * Get a list of the players near this NPC. This is used to determine who we should
-     * send chat messages to. It also resets the last time we saw a player, which can
-     * be useful.
+     * Set of nearby visible players and distances - empty if no nearby player is a real player.
      */
-    Set<Player> getNearPlayers(double d) {
-        Set<Player> r = new HashSet<>();
+    Set<NearbyPlayer> nearbyPlayers = emptySet;
+
+
+    /**
+     * Used to scan nearby entities for both players and mobs. Once a second should do it.
+     *
+     * One result is the nearbyPlayers set, which will only have members IF one of the nearby
+     * players is a real player and not an NPC to avoid wasting AI requests (if a tree falls in
+     * the forest and there's no-one to hear it, does it make a sound? Here, it doesn't).
+     *
+     * Another result is the nearestMonster (could be null) and the nearestMonsterDistance
+     *
+     * A final result is playerLastSawTime, the last time we saw a player.
+     *
+     * @param d range in x and y
+     * @param dy range in y
+     *
+     */
+    private void updateNearbyEntities(double d, double dy){
+        Set<NearbyPlayer> r = new HashSet<>();
         boolean nonNPCPresent = false;
-        // note the 1 - we have to be roughly on the same level, AND we have to be able to see them.
-        // Actually, we check to see if they can see *us*.
-        for (Entity e : npc.getEntity().getNearbyEntities(d, 2, d)) {
-            if (e instanceof Player) {
-                Player p = (Player) e;
+        Location myLocation = npc.getStoredLocation();
+
+        for (Entity e : npc.getEntity().getNearbyEntities(d, dy, d)) {
+            if (e instanceof Player p) {
                 if (!CitizensAPI.getNPCRegistry().isNPC(e))
                     nonNPCPresent = true;
+                // Actually, we check to see if they can see *us*.
                 // now, I'm going to recycle this bit of code so we can store
                 // when we last saw a player! We only "see" a player when we try
                 // to talk, which is semantically odd, but it should work.
                 playerLastSawTime.put(p.getName().toLowerCase(), Instant.now());
                 if (p.hasLineOfSight(npc.getEntity())) {
-                    r.add(p);
-                    //Plugin.log("ADDING: "+p.getDisplayName());
+                    double dx = myLocation.getX() - p.getLocation().getX();
+                    double dz = myLocation.getZ() - p.getLocation().getZ();
+                    double dist = Math.sqrt(dx * dx + dz * dz);
+                    double disty = myLocation.getY() - p.getLocation().getY();
+                    r.add(new NearbyPlayer(p, dist, disty));
+                    if(debug)
+                        Plugin.log(String.format("%s scan ADDING %s (dist %.2f dy %.2f)",
+                                npc.getEntity().getName(), p.getDisplayName(), dist, disty));
+                }
+            } else if(e instanceof Monster m){
+                double dist = m.getLocation().distance(npc.getEntity().getLocation());
+                if (nearestMonster == null || dist < nearestMonsterDist) {
+                    nearestMonster = m;
+                    nearestMonsterDist = dist;
+                    if(m.hasLineOfSight(npc.getEntity())){
+                        if(nearestVisibleMonster == null || dist < nearestVisibleMonsterDist) {
+                            nearestVisibleMonster = m;
+                            nearestVisibleMonsterDist = dist;
+                        }
+                    }
                 }
             }
         }
         // if there are no *real* players nearby, don't waste AI tokens on greeting.
         if (nonNPCPresent)
-            return r;
+            nearbyPlayers = r;
         else
-            return new HashSet<>();
+            nearbyPlayers = emptySet;
     }
+
+
+
+
+    // result of getNearbyHostile
+
 
     /**
      * Add the inventory as a JSON array to a JsonObject, if we are carrying anything
-     * @return JSON array
      */
     private void appendInventory(JsonObject root) {
         JsonArray arr = new JsonArray();
         boolean isempty=true;
-        if (npc.getEntity() instanceof Player) {
-            Player p = (Player) npc.getEntity();
+        if (npc.getEntity() instanceof Player p) {
             Inventory inv = p.getInventory();
             ItemStack[] items = inv.getContents();
             for (ItemStack item : items) {
@@ -487,7 +548,7 @@ public class GeminiNPCTrait extends Trait {
      * Part of the environment builder - append any combat data to a JsonObject
      */
     private void appendCombatData(JsonObject root) {
-        Sentinel.SentinelData d = plugin.getInstance().sentinelPlugin.makeData(npc);
+        Sentinel.SentinelData d = Plugin.getInstance().sentinelPlugin.makeData(npc);
 
         if(whenLastDamaged >= 0){
             // was this longer ago than a given duration?
@@ -499,6 +560,14 @@ public class GeminiNPCTrait extends Trait {
                 root.addProperty("attacked", String.format("%s was recently attacked by %s",
                         getNPC().getName(), whoDamagedBy.getName()));
             }
+        }
+
+        if(nearestVisibleMonster!=null){
+            root.addProperty("you can see", nearestVisibleMonster.getName());
+        } else if(nearestMonster!=null){
+            root.addProperty("you can hear", nearestMonster.getName());
+        } else {
+            root.addProperty("you can see", "no monsters");
         }
 
         if (d != null) {
@@ -526,13 +595,6 @@ public class GeminiNPCTrait extends Trait {
     }
 
     JsonObject prevContext = null;
-
-    // we have to do a getNearbyEntities query in the main thread, so the trait holds onto this for use
-    // in getContext. It also gets reused in a few places.
-
-    Set<Player> nearPlayers;
-
-
 
     /**
      * Get the context (environment, inventory etc.) as a JSON object, leaving out unchanged elements
@@ -628,15 +690,17 @@ public class GeminiNPCTrait extends Trait {
 
 
         // who is nearby?
-        if(!nearPlayers.isEmpty()) {
-            JsonArray nearbyPlayers = new JsonArray();
-            var st = nearPlayers.stream()
-                    .map(Player::getDisplayName)
-                    .map(ChatColor::stripColor);
-            for(var s : st.collect(Collectors.toList())){
-                nearbyPlayers.add(s);
+        if(!nearbyPlayers.isEmpty()) {
+            JsonArray json = new JsonArray();
+
+            var st = nearbyPlayers.stream()
+                    .filter(p -> p.d < VERY_CLOSE_PLAYERS_DIST
+                            && p.dy < VERY_CLOSE_PLAYERS_DISTY)      // quite close
+                    .map(p -> ChatColor.stripColor(p.p.getDisplayName()));
+            for(var s : st.toList()){
+                json.add(s);
             }
-            root.add("nearbyPlayers", nearbyPlayers);
+            root.add("nearbyPlayers", json);
         }
 
         // light conditions?
@@ -652,8 +716,6 @@ public class GeminiNPCTrait extends Trait {
         appendCombatData(root);
         // and the inventory
         appendInventory(root);
-
-        String name = npc.getFullName();
 
         JsonObject diffs = getDifferences(prevContext,root);
         prevContext = root;
@@ -686,7 +748,7 @@ public class GeminiNPCTrait extends Trait {
             }
 
             if(waypoints.getNumberOfWaypoints()>0){
-                var locs = waypoints.getWaypointNames().stream().collect(Collectors.joining(","));
+                var locs = String.join(",", waypoints.getWaypointNames());
                 parts.add(getPartFromText("go-instruction"));
                 parts.add(Part.fromText(plugin.getText("location-list-start") + locs));
                 for(String name : waypoints.getWaypointNames()) {
@@ -703,7 +765,7 @@ public class GeminiNPCTrait extends Trait {
 
             Content systemInstruction = b.build();
             if(plugin.showSystemInstructions)
-                plugin.log("System instruction for "+npc.getName()+" is "+ systemInstruction.toJson());
+                Plugin.log("System instruction for "+npc.getName()+" is "+ systemInstruction.toJson());
 
             // add this to the config.
             GenerateContentConfig config = GenerateContentConfig.builder()
@@ -746,8 +808,8 @@ public class GeminiNPCTrait extends Trait {
         }
 
         // look for nearby players, and only do something if there are some.
-        nearPlayers = getNearPlayers(12); // audible distance
-        if (!nearPlayers.isEmpty()) {
+        // Are any players less than 12m away?
+        if (nearbyPlayers.stream().anyMatch(p -> p.d < 12)) {
             // start a new thread which sends to the AI and waits for the result
             new Thread(() -> {
                 plugin.eventRateTracker.event();
@@ -780,10 +842,12 @@ public class GeminiNPCTrait extends Trait {
     }
 
     private void processGreet() {
-        Set<Player> players = getNearPlayers(10); // shorter range than nearPlayers?
         // pick one who isn't in the "near players for greet" list - i.e. who has just turned up
-        for (Player p : players) {
-            if (!nearPlayersForGreet.contains(p)) {
+        HashSet<Player> newGreetList = new HashSet<>();
+        for (NearbyPlayer np : nearbyPlayers) {
+            Player p = np.p;
+            newGreetList.add(p);
+            if (np.d < 10 && np.dy < 2 && !nearPlayersForGreet.contains(np.p)) {
                 // make sure we haven't greeted them recently
                 Long lastGreet = lastGreetedTime.get(p.getName().toLowerCase());
                 if (lastGreet == null || (System.currentTimeMillis() - lastGreet) > 60000) { // 1 minute
@@ -795,7 +859,7 @@ public class GeminiNPCTrait extends Trait {
                 }
             }
         }
-        nearPlayersForGreet = players; // update the list of players we have greeted
+        nearPlayersForGreet = newGreetList;
     }
 
     void pathTo(String name) throws Waypoints.Exception {
