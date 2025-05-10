@@ -456,17 +456,7 @@ public class Plugin extends JavaPlugin implements Listener {
     @Cmd(desc="Get info on an NPC", argc=0, cz=true)
     public void info(CallInfo c){
         GeminiNPCTrait t = c.getCitizen();
-        c.msg("NPC "+t.getNPC().getName());
-        c.msg("  Persona: "+t.personaName);
-        c.msg("  Waypoints:");
-        for(String name:t.waypoints.getWaypointNames()) {
-            try {
-                Waypoint w = t.waypoints.getWaypoint(name);
-                c.msg("    " + name + " : " + w.toString());
-            } catch (Waypoints.Exception e) {
-                c.msg("    " + name + " : ERROR: " + e.getMessage());
-            }
-        }
+        c.getCitizen().showInfo(c);
     }
 
     /**

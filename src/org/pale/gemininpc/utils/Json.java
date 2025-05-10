@@ -1,8 +1,8 @@
-package org.pale.gemininpc;
+package org.pale.gemininpc.utils;
 
 import com.google.gson.JsonObject;
 
-public class Utils {
+public class Json {
     /**
      * Given two JsonObjects, this method will compare them and return a JsonObject which only
      * contains the differences - i.e. those which have changed between prev and curr. It should
