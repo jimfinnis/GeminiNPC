@@ -1,11 +1,12 @@
 package org.pale.gemininpc.plugininterfaces;
 
+import java.util.Objects;
 import java.util.UUID;
 
 import net.citizensnpcs.api.npc.NPC;
-import net.citizensnpcs.api.trait.trait.Inventory;
 
 import org.bukkit.Bukkit;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
 import org.mcmonkey.sentinel.SentinelTrait;
 import org.pale.gemininpc.ExternalPluginInterface;
@@ -13,7 +14,7 @@ import org.pale.gemininpc.GeminiNPCTrait;
 
 public class Sentinel extends ExternalPluginInterface {
 
-	public class SentinelData {
+	public static class SentinelData {
 
 		public long timeSinceAttack;
 		public String guarding; // "nothing", player name, or "something" if not guarding a player
@@ -31,7 +32,7 @@ public class Sentinel extends ExternalPluginInterface {
 		if(isValid()){
 			if(!n.hasTrait(SentinelTrait.class))
 				return;
-			SentinelTrait t = n.getTrait(SentinelTrait.class);
+			SentinelTrait t = n.getOrAddTrait(SentinelTrait.class);
 			t.setGuarding(id);
 		}
 	}
@@ -56,7 +57,9 @@ public class Sentinel extends ExternalPluginInterface {
 			d.debug = "TSA: "+t.timeSinceAttack+" TS: "+ct.timeSpawned;
 			
 			
-			double maxh = t.getLivingEntity().getMaxHealth();
+			double maxh = Objects.requireNonNull(t.getLivingEntity()
+					.getAttribute(Attribute.GENERIC_MAX_HEALTH))
+					.getDefaultValue();
 			double h = t.getLivingEntity().getHealth();
 			
 			d.health = (h/maxh)*100.0;

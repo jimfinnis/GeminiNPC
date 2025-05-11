@@ -2,11 +2,8 @@ package org.pale.gemininpc;
 
 import net.citizensnpcs.api.ai.event.NavigationCancelEvent;
 import net.citizensnpcs.api.ai.event.NavigationCompleteEvent;
-import net.citizensnpcs.api.ai.event.NavigationEvent;
-import net.citizensnpcs.api.ai.event.NavigationStuckEvent;
 import net.citizensnpcs.api.event.NPCRightClickEvent;
 import net.citizensnpcs.api.npc.NPC;
-import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Entity;
@@ -18,7 +15,6 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -53,12 +49,12 @@ public final class ChatEventListener implements Listener {
     /**
      * This is the event handler for when a player right clicks on an NPC.
      *
-     * @param event
+     * @param event the event
      */
     @EventHandler
     public void click(NPCRightClickEvent event) {
         NPC npc = event.getNPC();
-        GeminiNPCTrait t = plugin.getTraitFor(npc);
+        GeminiNPCTrait t = Plugin.getTraitFor(npc);
         if (t == null) {
             return;
         }
@@ -83,8 +79,7 @@ public final class ChatEventListener implements Listener {
         Plugin.log("Attacker: " + attacker.getName()+" is a "+attacker.getType().name());
         // if an entity is shot, the attacker is actually the arrow - change that to the entity
         // that fired it.
-        if(attacker instanceof Arrow){
-            Arrow arrow = (Arrow) attacker;
+        if(attacker instanceof Arrow arrow){
             Plugin.log("Arrow shooter: " + attacker.getName()+" is a "+attacker.getType().name());
             if(arrow.getShooter() instanceof Entity){
                 attacker = (Entity) arrow.getShooter();
@@ -92,7 +87,7 @@ public final class ChatEventListener implements Listener {
         }
         // if the attacker is a player, we need to check if it's one of our NPCs and note it.
         if(attacker instanceof Player) {
-            GeminiNPCTrait t = plugin.getTraitFor(attacker);
+            GeminiNPCTrait t = Plugin.getTraitFor(attacker);
             if (t != null) {
                 Plugin.log("NPC " + t.getNPC().getFullName() + " damaged " + defender.getName());
                 // at this point we know that one of our NPCs attacked. We can assume that it will be
@@ -102,7 +97,7 @@ public final class ChatEventListener implements Listener {
         }
         // if the attacker is a mob, is the defender one of our NPCs?
         if(defender instanceof Player) {
-            GeminiNPCTrait t = plugin.getTraitFor(defender);
+            GeminiNPCTrait t = Plugin.getTraitFor(defender);
             if (t != null) {
                 Plugin.log("NPC " + t.getNPC().getFullName() + " damaged by " + attacker.getName());
                 // at this point we know that one of our NPCs was attacked.
@@ -113,7 +108,7 @@ public final class ChatEventListener implements Listener {
 
     /**
      * This is a handler for when an entity dies - we want to see if we were responsible and respond accordingly.
-     * @param event
+     * @param event the event
      */
 
     @EventHandler
@@ -133,7 +128,7 @@ public final class ChatEventListener implements Listener {
     @EventHandler
     public void navCancelled(NavigationCancelEvent e){
         NPC npc = e.getNPC();
-        GeminiNPCTrait t = plugin.getTraitFor(npc);
+        GeminiNPCTrait t = Plugin.getTraitFor(npc);
         if(t != null) {
             t.navComplete(GeminiNPCTrait.NavCompletionCode.CANCELLED);
         }
@@ -142,7 +137,7 @@ public final class ChatEventListener implements Listener {
     @EventHandler
     public void navEnded(NavigationCompleteEvent e){
         NPC npc = e.getNPC();
-        GeminiNPCTrait t = plugin.getTraitFor(npc);
+        GeminiNPCTrait t = Plugin.getTraitFor(npc);
         if(t != null) {
             t.navComplete(GeminiNPCTrait.NavCompletionCode.ARRIVED);
         }

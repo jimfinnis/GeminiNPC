@@ -2,7 +2,6 @@ package org.pale.gemininpc;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.time.Instant;
 import java.util.concurrent.ThreadLocalRandom;
 
 import com.google.gson.*;
@@ -15,7 +14,6 @@ import net.citizensnpcs.api.util.DataKey;
 import org.bukkit.*;
 import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
-import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Monster;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.Inventory;
@@ -86,7 +84,7 @@ public class GeminiNPCTrait extends Trait {
     // This object will "hang on" to the monster for a while, so we can ask the AI about it.
     // The keys we will use are "visible" and "heard"
 
-    record MonsterData(String m, double dist) {};
+    record MonsterData(String m, double dist) {}
     TransientNotification<MonsterData> nearestMonster = new TransientNotification<>(30);
     TransientNotification<MonsterData> nearestVisibleMonster = new TransientNotification<>(20);
 
@@ -110,6 +108,9 @@ public class GeminiNPCTrait extends Trait {
     // because we don't care what it is - it's not used.
     TransientNotificationMap<Object> recentlySeenPlayers = new TransientNotificationMap<>(60);
 
+    // throttles the infrequent update on individual NPCs
+    TransientNotification<Object> updateInfrequentRecently = new TransientNotification<>(60);
+
     // The "chat" part of the GenAI api is synchronous, so we use a queue and a thread to
     // make it non-blocking. Requests are sent to the AI in a thread, and when the response
     // is returned it is added to this queue. We don't need to store the player, because the
@@ -129,9 +130,14 @@ public class GeminiNPCTrait extends Trait {
     Waypoints waypoints = new Waypoints();
 
     /**
-     * This gets called very infrequently, randomly.
+     * This gets called very infrequently, randomly. And never more than the per-NPC
+     * updateInfrequentRecently allows.
      */
     public void updateInfrequent() {
+        if(updateInfrequentRecently.active()) {
+            return;
+        }
+        updateInfrequentRecently.set(null);
         respondTo(null, "(you look around)");
     }
 
@@ -435,13 +441,19 @@ public class GeminiNPCTrait extends Trait {
         }
     }
 
+    /**
+     * Get the persona string from the plugin, applying templates as necessary. Only done
+     * when a chat is created! It's probably expensive.
+     * @param pname persona name
+     * @return the processed persona string
+     */
     private String getPersonaString(String pname) {
-        // get the persona string from the plugin
         String s = Plugin.getInstance().getPersonaString(pname);
         if (s == null) {
             // if we don't have a persona, use the default.
             s = DEFAULT_PERSONA;
         }
+        s = plugin.applyTemplateToPersona(this, s);
         return s;
     }
 
@@ -463,11 +475,9 @@ public class GeminiNPCTrait extends Trait {
 
     /**
      * Used to scan nearby entities for both players and mobs. Once a second should do it.
-     *
      * One result is the nearbyPlayers set, which will only have members IF one of the nearby
      * players is a real player and not an NPC to avoid wasting AI requests (if a tree falls in
      * the forest and there's no-one to hear it, does it make a sound? Here, it doesn't).
-     *
      * Another result is the nearestMonster (could be null) and the nearestMonsterDistance
      *
      * @param d range in x and y

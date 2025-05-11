@@ -31,6 +31,7 @@ import org.jetbrains.annotations.NotNull;
 import org.pale.gemininpc.Command.*;
 import org.pale.gemininpc.plugininterfaces.NPCDestinations;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
+import org.pale.gemininpc.utils.TemplateFunctions;
 import org.pale.gemininpc.waypoints.Waypoint;
 import org.pale.gemininpc.waypoints.Waypoints;
 
@@ -49,9 +50,8 @@ public class Plugin extends JavaPlugin implements Listener {
     boolean showSystemInstructions; // config option
     int attackNotificationDuration; // config option - how many seconds does the "you have been attacked by.." last
     boolean callsEnabled = true;    // use to disable calls to Gemini LLM model
-
     private final Registry commandRegistry = new Registry(ROOTCMDNAME);
-
+    static final int TICK_RATE = 20;
     // interfaces to other plugins
     NPCDestinations ndPlugin;
     Sentinel sentinelPlugin;
@@ -142,15 +142,19 @@ public class Plugin extends JavaPlugin implements Listener {
         if(!Bukkit.getScheduler().isCurrentlyRunning(sched)){
             sched = Bukkit.getScheduler().scheduleSyncRepeatingTask(this, () -> {
                 // pick a random "chatter"
-                NPC npc = chatters.stream()
-                        .skip(new Random().nextInt(chatters.size()))
-                        .findFirst().orElse(null);
-                if (npc != null) {
-                    GeminiNPCTrait t = getTraitFor(npc);
-                    if (t != null)
-                        t.updateInfrequent();
+                if(!chatters.isEmpty()) {
+                    NPC npc = chatters.stream()
+                            .skip(new Random().nextInt(chatters.size()))
+                            .findFirst().orElse(null);
+                    if (npc != null) {
+                        GeminiNPCTrait t = getTraitFor(npc);
+                        if (t != null)
+                            t.updateInfrequent();
+                    }
                 }
-            }, 20*60, 20*10); // every ten seconds we update one AI. Delay of 1 min before we start
+            }, TICK_RATE*60, TICK_RATE*30); // every 30 seconds we update one AI. Delay of 1 min before we start
+            // If an AI has been updated recently, this won't happen because the trait will rate-limit
+            // on a per-NPC basis. That way we don't get single-NPC worlds constantly updating 1 AI.
         }
 
         getLogger().info("GeminiNPC has been enabled");
@@ -160,8 +164,16 @@ public class Plugin extends JavaPlugin implements Listener {
     public final Map<String, String> personae = new HashMap<>();
     // This is a map of common texts used in the plugin.
     private final Map<String, String> texts = new HashMap<>();
+    /**
+     * These are the variables in the template system which can be replaced, and their
+     * replacement values - often strings but sometimes not (e.g. lists of strings are permitted).
+     * They are applied to persona files when the persona is set on the NPC.
+     */
+    Map<String, Object> templateValues = new HashMap<>();
+    String common; // all personae prefixed by this
 
-    interface FileProcessor {
+
+    public interface FileProcessor {
         void run(String nameOfFile, String fileContents);
     }
     /**
@@ -183,7 +195,7 @@ public class Plugin extends JavaPlugin implements Listener {
             if(!p.toFile().exists()){
                 warn(dirListName+" directory "+s+" does not exist");
             } else {
-                log(dirListName+" directory: "+p.toString());
+                log(dirListName+" directory: "+p);
             }
             try {
                 Files.list(p).forEach(f -> {
@@ -193,6 +205,8 @@ public class Plugin extends JavaPlugin implements Listener {
                         function.run(name, data);
                     } catch (Exception e) {
                         warn("File error " + f);
+                        e.printStackTrace();
+                        log("Exception "+e);
                     }
                 });
             } catch (Exception e) {
@@ -208,7 +222,7 @@ public class Plugin extends JavaPlugin implements Listener {
         // get the common persona data - this is a set of instructions that are common to all -
         // and prepend to the data for each persona.
         ConfigurationSection ps = c.getConfigurationSection("main");
-        String common = Objects.requireNonNull(ps).getString("common", "");
+        common = Objects.requireNonNull(ps).getString("common", "");
         if (!common.isEmpty()) {
             try {
                 Path p = Paths.get(common);
@@ -226,27 +240,31 @@ public class Plugin extends JavaPlugin implements Listener {
 
         // now load the special template items - these are texts that used as tags in the persona data
 
-        Map<String, String> templateValues = new HashMap<>();
         processFilesInConfigDirectory(c, "template-value-directories",
                 templateValues::put);
 
-        // and load the personae, using the template values
-        final String commonFinal = common;
+        // and some other template values from the main
+        ConfigurationSection template_values = c.getConfigurationSection("template-values");
+        if (template_values != null) {
+            for (String key : template_values.getKeys(false)) {
+                if(template_values.isList(key)){
+                    log("template list found: "+key);
+                    List<String> values = template_values.getStringList(key);
+                    templateValues.put(key, values);
+                } else if(template_values.isString(key)){
+                    log("template string found: "+key);
+                    String value = template_values.getString(key);
+                    templateValues.put(key, value);
+                } else {
+                    getLogger().warning("Template value "+key+" is not a string or list");
+                }
+            }
+        }
+
+        // and load the personae, not using the template values just yet!
+        //                    log("Persona " + name + " is " + data);
         processFilesInConfigDirectory(c, "persona-directories",
-                (name, data) -> {
-                    // the doc advises creating a new context each time!
-                    TemplateContext tc = new TemplateContext();
-                    for (String key : templateValues.keySet()) {
-                        tc.set(key, templateValues.get(key));
-                    }
-                    // this seems cumbersome - we just want to run the templating engine on
-                    // the data. Note that we're prepending the common text first, so the template
-                    // engine can run on that!
-                    TemplateLoader.MapTemplateLoader tl = new TemplateLoader.MapTemplateLoader();
-                    tl.set("data", commonFinal+"\n"+data);
-                    Template t = tl.load("data"); // ffs
-                    personae.put(name, t.render(tc));
-                });
+                personae::put);
 
         // finally pull in the common texts, which are in the "texts" section.
         ConfigurationSection cs = c.getConfigurationSection("texts");
@@ -262,7 +280,7 @@ public class Plugin extends JavaPlugin implements Listener {
 
     /**
      * Return one of the standard texts, or "text-.." if it's not found
-     * @param name
+     * @param name name of text
      */
     public String getText(String name){
         if (texts.containsKey(name)) {
@@ -271,6 +289,40 @@ public class Plugin extends JavaPlugin implements Listener {
             getLogger().severe("Cannot find text: "+name);
             return "TEXT-" + name;
         }
+    }
+
+    /**
+     * Apply the template system to the persona but with the PRNG keyed
+     * to the NPC's name, so it will always be the same if there are random
+     * elements. We don't want weird personality changes!
+     * @param t the trait
+     * @param persona_string the persona string, not yet processed through the templater
+     * @return the processed persona string
+     */
+    public String applyTemplateToPersona(GeminiNPCTrait t, String persona_string){
+        // the doc advises creating a new context each time!
+        TemplateContext tc = new TemplateContext();
+        for (String key : templateValues.keySet()) {
+            tc.set(key, templateValues.get(key));
+        }
+
+        // create a template function object for this NPC
+        TemplateFunctions f = new TemplateFunctions(t);
+        f.addFunctions(tc);
+
+        for(String s: tc.getVariables()){
+            log("Template variable: "+s+" = "+tc.get(s));
+        }
+
+        // this seems cumbersome - we just want to run the templating engine on
+        // the data. Note that we're prepending the common text first, so the template
+        // engine can run on that!
+        TemplateLoader.MapTemplateLoader tl = new TemplateLoader.MapTemplateLoader();
+        tl.set("data", common+"\n"+persona_string);
+        Template template = tl.load("data"); // ffs
+        String s= template.render(tc);
+        log("Template applied to " + t.getNPC().getName() + " is " + s);
+        return s;
     }
 
     // Handy function to send a message to the command sender.
@@ -343,7 +395,7 @@ public class Plugin extends JavaPlugin implements Listener {
 
 
     public static boolean isNear(Location a, Location b, double dist, double ydist) {
-        return (a.distance(b) < dist && Math.abs(a.getY() - b.getY()) < 2);
+        return (a.distance(b) < dist && Math.abs(a.getY() - b.getY()) < ydist);
     }
 
     /**
@@ -455,14 +507,13 @@ public class Plugin extends JavaPlugin implements Listener {
 
     @Cmd(desc="Get info on an NPC", argc=0, cz=true)
     public void info(CallInfo c){
-        GeminiNPCTrait t = c.getCitizen();
         c.getCitizen().showInfo(c);
     }
 
     /**
      * assuming the description starts with the second argument, concatenate remaining arguments into
      * a single string
-     * @param c
+     * @param c the call info
      * @return a single string
      */
     private static String getdesc(CallInfo c){
@@ -532,9 +583,8 @@ public class Plugin extends JavaPlugin implements Listener {
         GeminiNPCTrait t = c.getCitizen();
         try {
             t.pathTo(name);
-            t.navCompletionHandler = (code, dist) -> {
-                c.msg(ChatColor.AQUA+"path to "+name+" completed: "+code.label+", dist="+dist);
-            };
+            t.navCompletionHandler = (code, dist) ->
+                        c.msg(ChatColor.AQUA+"path to "+name+" completed: "+code.label+", dist="+dist);
             c.msg("Navigating to "+name+": "+t.waypoints.getWaypoint(name).toString());
         } catch (Waypoints.Exception e) {
             c.msg(ChatColor.RED+"Waypoint path error: "+e.getMessage());
