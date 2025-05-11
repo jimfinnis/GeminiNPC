@@ -41,13 +41,6 @@ public class TemplateFunctions {
         int apply(int arg1, int arg2);
     }
 
-    @FunctionalInterface
-    public interface BoolNoArgsFunction {
-        @SuppressWarnings("unused")
-        boolean apply();
-    }
-
-
     /**
      * Add functions to the template context. This is run every time the template is used!
      * @param tc the template context to add to
@@ -57,7 +50,6 @@ public class TemplateFunctions {
         tc.set("choose", stringChooseFunction);
         tc.set("pick", pickFunction);
         tc.set("random", randomFunction);
-        tc.set("isSentinel", isSentinel);
     }
 
     /**
@@ -95,9 +87,4 @@ public class TemplateFunctions {
      */
 
     public final IntIntToIntFunction randomFunction = (a, b) -> prng.nextInt(a, b);
-
-    public final BoolNoArgsFunction isSentinel = () -> {
-        if (trait == null) return false;
-        return trait.getNPC().hasTrait(SentinelTrait.class);
-    };
 }

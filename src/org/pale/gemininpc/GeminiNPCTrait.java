@@ -126,8 +126,8 @@ public class GeminiNPCTrait extends Trait {
     static final String DEFAULT_PERSONA = "You have no memory of who or what you are.";
 
     String personaName = "default"; // the name of the persona
-
     Waypoints waypoints = new Waypoints();
+    String gender = null;
 
     /**
      * This gets called very infrequently, randomly. And never more than the per-NPC
@@ -168,6 +168,10 @@ public class GeminiNPCTrait extends Trait {
         }
     }
 
+    public void setGender(String s){
+        gender = s;
+    }
+
 
 
     // Here you should load up any values you have previously saved (optional).
@@ -177,12 +181,14 @@ public class GeminiNPCTrait extends Trait {
     public void load(DataKey key) {
         // we load the entire persona string.
         personaName = key.getString("pname", "default");
+        gender = key.getString("gender", plugin.defaultGender);
         waypoints.load(key);
     }
 
     // Save settings for this NPC (optional). These values will be persisted to the Citizens saves file
     public void save(DataKey key) {
         key.setString("pname", personaName);
+        key.setString("gender",gender);
         waypoints.save(key);
     }
 
@@ -716,11 +722,12 @@ public class GeminiNPCTrait extends Trait {
 
         // light conditions?
         if(totalLight>0){
-            root.addProperty("light", String.format("%d/15", totalLight));
-            root.addProperty("skylight", String.format("%d/15", skyLight));
-            root.addProperty("lamplight", String.format("%d/15", blockLight));
+            root.addProperty("light from the sun", String.format("%d/15", skyLight));
+            root.addProperty("light from lamps", String.format("%d/15", blockLight));
+
         } else {
-            root.addProperty("light", "dark");
+            root.addProperty("light from the sun", "none");
+            root.addProperty("light from lamps", "none");
         }
 
         // now, add the combat data - extra data will also be added if this is a Sentinel

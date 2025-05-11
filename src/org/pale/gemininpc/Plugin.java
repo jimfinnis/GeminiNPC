@@ -28,6 +28,7 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 
 import org.jetbrains.annotations.NotNull;
+import org.mcmonkey.sentinel.SentinelTrait;
 import org.pale.gemininpc.Command.*;
 import org.pale.gemininpc.plugininterfaces.NPCDestinations;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
@@ -52,6 +53,7 @@ public class Plugin extends JavaPlugin implements Listener {
     boolean callsEnabled = true;    // use to disable calls to Gemini LLM model
     private final Registry commandRegistry = new Registry(ROOTCMDNAME);
     static final int TICK_RATE = 20;
+    public String defaultGender = "non-binary";
     // interfaces to other plugins
     NPCDestinations ndPlugin;
     Sentinel sentinelPlugin;
@@ -234,6 +236,8 @@ public class Plugin extends JavaPlugin implements Listener {
         }
         log("Common persona data is " + common.length() + " chars");
 
+        defaultGender = ps.getString("default-gender","non-binary");
+
         // various flags and that
         showSystemInstructions = ps.getBoolean("show-system-instructions", false);
         attackNotificationDuration = ps.getInt("attack-notification-duration", 20);
@@ -309,6 +313,11 @@ public class Plugin extends JavaPlugin implements Listener {
         // create a template function object for this NPC
         TemplateFunctions f = new TemplateFunctions(t);
         f.addFunctions(tc);
+
+        // set some special values
+        tc.set("name",t.getNPC().getName());
+        tc.set("gender",t.gender);
+        tc.set("isSentinel",t.getNPC().hasTrait(SentinelTrait.class));
 
         for(String s: tc.getVariables()){
             log("Template variable: "+s+" = "+tc.get(s));
@@ -492,7 +501,7 @@ public class Plugin extends JavaPlugin implements Listener {
         c.msg("NPCs with a persona:");
         for (NPC npc : chatters) {
             GeminiNPCTrait t = getTraitFor(npc);
-            c.msg(ChatColor.AQUA + npc.getName()+" : "+t.personaName);
+            c.msg(ChatColor.AQUA + npc.getName()+" : "+t.personaName +" ("+t.gender+")");
         }
     }
 
@@ -616,6 +625,54 @@ public class Plugin extends JavaPlugin implements Listener {
     public void enable(CallInfo c){
         c.msg(ChatColor.AQUA+"Enable AI model calls");
         callsEnabled = true;
+    }
+
+    @Cmd(desc="set the gender", cz=true,argc=1)
+    public void gender(CallInfo c){
+        String gender = c.getArgs()[0];
+        c.msg(ChatColor.AQUA+"Setting gender to "+gender);
+        c.getCitizen().setGender(gender);
+    }
+
+    @Cmd(desc="quick set of persona and/or gender, e.g. qs Boris g=male p=soldier1")
+    public void qs(CallInfo c){
+        String[] args = c.getArgs();
+        if(args.length<1){
+            c.msg(ChatColor.RED+"need at least an NPC name");
+            return;
+        }
+        String name = args[0];
+        GeminiNPCTrait t = chatters.stream()
+                .filter(npc -> npc.getName().equals(name))
+                .findFirst()
+                .map(npc -> getTraitFor(npc))
+                .orElse(null);
+        if(t==null){
+            c.msg(ChatColor.RED+"No such NPC "+name);
+            return;
+        }
+
+        for(int i=1;i<args.length;i++){
+            String arg = args[i];
+            switch (arg.substring(0, 2)) {
+                case "p=" -> {
+                    String persona = arg.substring(2);
+                    if (personae.containsKey(persona)) {
+                        t.setPersona(persona);
+                    } else {
+                        Plugin.warn("No persona " + persona + " exists");
+                        c.msg("Persona " + ChatColor.RED + persona + ChatColor.YELLOW
+                                + " does not exist");
+                    }
+                }
+                case "g=" -> {
+                    String gender = arg.substring(2);
+                    t.setGender(gender);
+                }
+                default -> c.msg(ChatColor.RED + "Unknown argument " + arg);
+            }
+        }
+
     }
 
 }

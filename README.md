@@ -56,10 +56,35 @@ main section:
 main:
     common: plugins/GeminiNPC/common
 ```
-This will be prepended to all the persona strings.
+This will be prepended to all the persona strings. Note that the template values `{{name}}` and `{{gender}}` are useful
+here, and there may be others that are handy. 
 
+## Templating
+
+Personae are passed through the [basis-template](https://github.com/badlogic/basis-template) templating engine. See that
+page for more details. The transformation takes place only once, however - when the AI is to be called for the first time.
+The following template values are available:
+* `name` - the name of the NPC
+* `gender` - the gender of the NPC (settable with `/gemini gender` and defaulted from the `default-gender` setting in the main section
+of the config file)
+* `isSentinel` is true if the NPC has the Sentinel trait
+
+More templates values can be set in two ways:
+* add a string to the `template-values` section of the config file
+* add a file to a directory listed in the `template-value-directories` key of the main section of the config.
+
+The following template functions are available:
+* `choose(list)` - randomly choose one of the string items in the list
+* `pick(list, n, delimiter)` - randomly choose `n` items from the list and join them with the delimiter. The same item
+cannot be chosen multiple times.
+* `random(lower, upper)` - randomly choose an integer between lower (inclusive) and upper (exclusive)
+
+Remember that this code only runs once, so if you want to change the template values, you'll need to reload the NPCs
+with `/gemini reload` or restart the server.
 
 ## What is sent
+
+A lot of the details here may change!
 
 Each turn, the plugin sends JSON block consisting of two elements - context and input. The latter is the actual
 string the model should respond to, the former is a JSON-like string that looks like this:
@@ -95,3 +120,4 @@ Most of what the context contains is obvious, but here are some notes:
 * `location` is a nearby waypoint name - GeminiNPC has its own waypoint system. NPCs are informed of their waypoints in the initial system instruction.
 * `location description` is a description of the waypoint.
 * `region` is information from the JCFUtils plugin's region mechanism - it gives the region name and description (if there is one).
+
