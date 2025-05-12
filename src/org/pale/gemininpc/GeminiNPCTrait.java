@@ -454,12 +454,14 @@ public class GeminiNPCTrait extends Trait {
      * @return the processed persona string
      */
     private String getPersonaString(String pname) {
-        String s = Plugin.getInstance().getPersonaString(pname);
-        if (s == null) {
+        Persona p = Plugin.getInstance().personae.get(pname);
+        String s;
+        if (p == null) {
             // if we don't have a persona, use the default.
             s = DEFAULT_PERSONA;
+        } else {
+            s = p.generateString(this);
         }
-        s = plugin.applyTemplateToPersona(this, s);
         return s;
     }
 
@@ -795,7 +797,7 @@ public class GeminiNPCTrait extends Trait {
             // the configuration file).
             chat = plugin.client.chats.create(plugin.model, config);
             log_debug("NPC " + npc.getFullName() + " has been created with model " + plugin.model);
-            log_debug("Persona: " + personaString);
+            log_debug("org.pale.gemininpc.Persona: " + personaString);
         }
     }
 
@@ -898,7 +900,7 @@ public class GeminiNPCTrait extends Trait {
      */
     void showInfo(CallInfo c){
         c.msg("NPC "+getNPC().getName());
-        c.msg("  Persona: "+personaName);
+        c.msg("  org.pale.gemininpc.Persona: "+personaName);
         c.msg("  Waypoints:");
         for(String name:waypoints.getWaypointNames()) {
             try {

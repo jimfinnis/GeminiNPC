@@ -163,7 +163,7 @@ public class Plugin extends JavaPlugin implements Listener {
     }
 
     // This is a map of persona name onto the persona string loaded from each file.
-    public final Map<String, String> personae = new HashMap<>();
+    public final Map<String, Persona> personae = new HashMap<>();
     // This is a map of common texts used in the plugin.
     private final Map<String, String> texts = new HashMap<>();
     /**
@@ -174,9 +174,24 @@ public class Plugin extends JavaPlugin implements Listener {
     Map<String, Object> templateValues = new HashMap<>();
     String common; // all personae prefixed by this
 
+    /**
+     * Used to read the contents of a file and warn if it fails, returning a string
+     * @param f the file path
+     * @param defaultString the string to use if we failed to load
+     * @return either the file contents or the default string
+     */
+    public String readFile(Path f, String defaultString){
+        String s = defaultString;
+        try {
+            s = Files.readString(f);
+        } catch (Exception e) {
+            getLogger().severe("CANNOT READ " + f);
+        }
+        return s;
+    }
 
     public interface FileProcessor {
-        void run(String nameOfFile, String fileContents);
+        void run(String nameOfFile, Path path);
     }
     /**
      * Given a config parameter "dirlist_name", if it exists in the configuration section,
@@ -202,20 +217,14 @@ public class Plugin extends JavaPlugin implements Listener {
             try {
                 Files.list(p).forEach(f -> {
                     String name = f.getFileName().toString();
-                    try {
-                        String data = Files.readString(f);
-                        function.run(name, data);
-                    } catch (Exception e) {
-                        warn("File error " + f);
-                        e.printStackTrace();
-                        log("Exception "+e);
-                    }
+                    function.run(name, f);
                 });
             } catch (Exception e) {
                 warn("CANNOT READ " + s);
             }
         }
     }
+
 
     public void loadConfig(FileConfiguration c) {
         // load all of the personae - these are name:filename pairs, paths relative
@@ -226,13 +235,7 @@ public class Plugin extends JavaPlugin implements Listener {
         ConfigurationSection ps = c.getConfigurationSection("main");
         common = Objects.requireNonNull(ps).getString("common", "");
         if (!common.isEmpty()) {
-            try {
-                Path p = Paths.get(common);
-                common = Files.readString(p);
-            } catch (Exception e) {
-                warn("CANNOT READ COMMON PERSONA " + common);
-                common = "";
-            }
+            common = readFile(Paths.get(common), "");
         }
         log("Common persona data is " + common.length() + " chars");
 
@@ -244,10 +247,14 @@ public class Plugin extends JavaPlugin implements Listener {
 
         // now load the special template items - these are texts that used as tags in the persona data
 
+        // First, for each file in the directories listed, add the contents of that file as a template value.
         processFilesInConfigDirectory(c, "template-value-directories",
-                templateValues::put);
+                (name, file)->{
+                    String template = readFile(file, "");
+                    templateValues.put(name, template);
+                });
 
-        // and some other template values from the main
+        // Then add some other template values from the main
         ConfigurationSection template_values = c.getConfigurationSection("template-values");
         if (template_values != null) {
             for (String key : template_values.getKeys(false)) {
@@ -266,9 +273,12 @@ public class Plugin extends JavaPlugin implements Listener {
         }
 
         // and load the personae, not using the template values just yet!
-        //                    log("Persona " + name + " is " + data);
+        //
         processFilesInConfigDirectory(c, "persona-directories",
-                personae::put);
+                (name, path) -> {
+                    Persona p = new Persona(name, path);
+                    personae.put(p.name, p);
+                });
 
         // finally pull in the common texts, which are in the "texts" section.
         ConfigurationSection cs = c.getConfigurationSection("texts");
@@ -293,45 +303,6 @@ public class Plugin extends JavaPlugin implements Listener {
             getLogger().severe("Cannot find text: "+name);
             return "TEXT-" + name;
         }
-    }
-
-    /**
-     * Apply the template system to the persona but with the PRNG keyed
-     * to the NPC's name, so it will always be the same if there are random
-     * elements. We don't want weird personality changes!
-     * @param t the trait
-     * @param persona_string the persona string, not yet processed through the templater
-     * @return the processed persona string
-     */
-    public String applyTemplateToPersona(GeminiNPCTrait t, String persona_string){
-        // the doc advises creating a new context each time!
-        TemplateContext tc = new TemplateContext();
-        for (String key : templateValues.keySet()) {
-            tc.set(key, templateValues.get(key));
-        }
-
-        // create a template function object for this NPC
-        TemplateFunctions f = new TemplateFunctions(t);
-        f.addFunctions(tc);
-
-        // set some special values
-        tc.set("name",t.getNPC().getName());
-        tc.set("gender",t.gender);
-        tc.set("isSentinel",t.getNPC().hasTrait(SentinelTrait.class));
-
-        for(String s: tc.getVariables()){
-            log("Template variable: "+s+" = "+tc.get(s));
-        }
-
-        // this seems cumbersome - we just want to run the templating engine on
-        // the data. Note that we're prepending the common text first, so the template
-        // engine can run on that!
-        TemplateLoader.MapTemplateLoader tl = new TemplateLoader.MapTemplateLoader();
-        tl.set("data", common+"\n"+persona_string);
-        Template template = tl.load("data"); // ffs
-        String s= template.render(tc);
-        log("Template applied to " + t.getNPC().getName() + " is " + s);
-        return s;
     }
 
     // Handy function to send a message to the command sender.
@@ -440,10 +411,6 @@ public class Plugin extends JavaPlugin implements Listener {
         }
     }
 
-    public String getPersonaString(String persona) {
-        return personae.getOrDefault(persona, null);
-    }
-
     /**
      * Commands
      */
@@ -456,7 +423,7 @@ public class Plugin extends JavaPlugin implements Listener {
             t.setPersona(persona);
         } else {
             Plugin.warn("No persona " + persona + " exists");
-            c.msg("Persona " + ChatColor.RED + persona + ChatColor.YELLOW
+            c.msg("org.pale.gemininpc.Persona " + ChatColor.RED + persona + ChatColor.YELLOW
                     + " does not exist");
         }
         c.msg("Set persona to " + ChatColor.AQUA + persona);
@@ -661,7 +628,7 @@ public class Plugin extends JavaPlugin implements Listener {
                         t.setPersona(persona);
                     } else {
                         Plugin.warn("No persona " + persona + " exists");
-                        c.msg("Persona " + ChatColor.RED + persona + ChatColor.YELLOW
+                        c.msg("org.pale.gemininpc.Persona " + ChatColor.RED + persona + ChatColor.YELLOW
                                 + " does not exist");
                     }
                 }
@@ -672,7 +639,5 @@ public class Plugin extends JavaPlugin implements Listener {
                 default -> c.msg(ChatColor.RED + "Unknown argument " + arg);
             }
         }
-
     }
-
 }
