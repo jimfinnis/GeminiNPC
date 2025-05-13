@@ -20,17 +20,17 @@ public class TemplateFunctions {
         prng = new Random(trait.getNPC().getName().hashCode());
     }
 
-    // function that takes a List<String> and returns a string
+    // function that takes a List<Object> and returns a string
     @FunctionalInterface
     public interface ListStringFunction {
         @SuppressWarnings("unused")
-        String apply(List<String> arg);
+        String apply(List<Object> arg);
     }
     // takes a list,int,string and returns a string
     @FunctionalInterface
-    public interface ListStringIntStringFunction {
+    public interface ListObjectIntStringFunction {
         @SuppressWarnings("unused")
-        String apply(List<String> arg1, int arg2, String s);
+        String apply(List<Object> arg1, int arg2, String s);
     }
 
     // annoyingly it seems it really needs the method to be called "apply", so we can't use
@@ -52,32 +52,51 @@ public class TemplateFunctions {
         tc.set("random", randomFunction);
     }
 
+    private String chooseItem(Object item, boolean remove) {
+        if(item instanceof List<?> sublist){
+            // if the item is a list, pick one random item from it
+            int idx;
+            if(sublist.isEmpty()) return "";
+            if(sublist.size() == 1)
+                idx = 0;
+            else
+                idx = prng.nextInt(sublist.size());
+            // get and perhaps remove the item
+            Object subitem = sublist.get(idx);
+            if(remove)
+                sublist.remove(idx);
+            // recursively call chooseItem on the item so nested lists work
+            return chooseItem(subitem, remove);
+        } else {
+            // otherwise just return the item
+            return item.toString();
+        }
+    }
+
     /**
      * Choose a random string from a list of strings using the PRNG seeded by setPRNGSeed.
      */
     private final ListStringFunction stringChooseFunction = (args) -> {
-        if(args.isEmpty()) return "";
-        if(args.size() == 1) return args.get(0);
-        int i = prng.nextInt(args.size());
-        System.out.println("Choosing " + i + " from " + args);
-        return args.get(i);
+        return chooseItem(args, false); // no need to remove, this is a single choice.
     };
 
     /**
-     * Given a list of strings, a count and a delimiter string, pick that many random strings from the list.
-     * They must all be different. Separate with newlines.
+     * Given a list, a count and a delimiter string, pick that many random elements from the list.
+     * They will all be different, because we remove them from the list as we go (we work from a copy).
+     * If the item is itself a list, one random item will be returned and the parent list will be removed.
+     * This lets us have mutually exclusive items - e.g. "a sword" or "a bow" but not both - by putting
+     * "sword" and "bow" in a sublist.
+     *
      */
-    private final ListStringIntStringFunction pickFunction = (args, count, s) -> {
-        if (args.isEmpty()) return "";
-        if (args.size() == 1) return args.get(0);
-        if (count > args.size()) count = args.size();
+    private final ListObjectIntStringFunction pickFunction = (args, count, s) -> {
+
         StringBuilder sb = new StringBuilder();
         args = new ArrayList<>(args); // make a copy of the list
         for (int i = 0; i < count; i++) {
-            int j = prng.nextInt(args.size());
-            sb.append(args.get(j));
-            if (i < count - 1) sb.append(s);
-            args.remove(j);
+            sb.append(chooseItem(args, true)); // choose and remove the item from the list
+            if (i < count - 1) {
+                sb.append(s); // add the delimiter
+            }
         }
         return sb.toString();
     };

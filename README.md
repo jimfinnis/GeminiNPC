@@ -95,17 +95,25 @@ More templates values can be set in two ways:
 * add a file to a directory listed in the `template-value-directories` key of the main section of the config.
 
 The following template functions are available:
-* `choose(list)` - randomly choose one of the string items in the list
+* `choose(list)` - randomly choose one of the items in the list. Sublists are permitted - see below.
 * `pick(list, n, delimiter)` - randomly choose `n` items from the list and join them with the delimiter. The same item
-cannot be chosen multiple times.
+cannot be chosen multiple times. Sublists are permitted - see below.
 * `random(lower, upper)` - randomly choose an integer between lower (inclusive) and upper (exclusive)
 
 Remember that this code only runs once, so if you want to change the template values, you'll need to reload the NPCs
 with `/gemini reload` or restart the server.
 
+### Sublists
+If an item chosen by `pick` or `choose` it itself a list, then an item will be chosen randomly from the nested list
+while (in the case of `pick`) the list itself will be removed from the list of items to choose from. This means that
+you can create mutually exclusive items by having a list of lists. See the next section for an example.
+
 ## A templated YAML persona example
+
 Here's an example of a YAML persona file that uses the templating engine. It uses the `pick` function to randomly
-choose an item from a list of personality traits. 
+choose an item from a list of personality traits. Note the two sublists in the `random_personality_features` list,
+used for mutually exclusive traits. The `pick` function will choose one of the sublists and then choose one of the items
+within that sublist.
 ```
 string: |
         You are a soldier, patrolling for monsters.
@@ -115,8 +123,12 @@ template-values:
     random_personality_features:
         - You really like tea.
         - You tend to ramble in your speech.
-        - You dislike daylight and prefer the dark.
-        - You are scared of monsters.
+        -
+            - You dislike daylight and prefer the dark.
+            - You are scared of the dark.
+        -
+            - You are scared of monsters.
+            - You quite like monsters and wish you could talk to them rather than kill.
         - You are plain-spoken.
         - You like working in the forge.
         - You don't like being outside, because of the dirt.
@@ -128,6 +140,7 @@ template-values:
         - You are a little too fond of bad puns.
         - You are a little too fond of swearing.
 ```
+
 
 
 ## What is sent
