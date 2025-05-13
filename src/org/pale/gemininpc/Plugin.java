@@ -7,6 +7,7 @@ import io.marioslab.basis.template.TemplateContext;
 import io.marioslab.basis.template.TemplateLoader;
 import net.citizensnpcs.api.CitizensAPI;
 
+import java.io.IOException;
 import java.util.*;
 import java.nio.file.Path;
 import java.nio.file.Files;
@@ -219,8 +220,8 @@ public class Plugin extends JavaPlugin implements Listener {
                     String name = f.getFileName().toString();
                     function.run(name, f);
                 });
-            } catch (Exception e) {
-                warn("CANNOT READ " + s);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
             }
         }
     }
@@ -251,24 +252,14 @@ public class Plugin extends JavaPlugin implements Listener {
         processFilesInConfigDirectory(c, "template-value-directories",
                 (name, file)->{
                     String template = readFile(file, "");
-                    templateValues.put(name, template);
+                    if(template!=null)templateValues.put(name, template);
                 });
 
         // Then add some other template values from the main
         ConfigurationSection template_values = c.getConfigurationSection("template-values");
         if (template_values != null) {
             for (String key : template_values.getKeys(false)) {
-                if(template_values.isList(key)){
-                    log("template list found: "+key);
-                    List<String> values = template_values.getStringList(key);
-                    templateValues.put(key, values);
-                } else if(template_values.isString(key)){
-                    log("template string found: "+key);
-                    String value = template_values.getString(key);
-                    templateValues.put(key, value);
-                } else {
-                    getLogger().warning("Template value "+key+" is not a string or list");
-                }
+                templateValues.put(key, template_values.get(key));
             }
         }
 

@@ -181,7 +181,10 @@ public class GeminiNPCTrait extends Trait {
     public void load(DataKey key) {
         // we load the entire persona string.
         personaName = key.getString("pname", "default");
-        gender = key.getString("gender", plugin.defaultGender);
+        // if gender is null when we come to actually generate the persona string,
+        // (i.e. a value is not provided in the NPC) we will use the persona to set it, which in turn
+        // may get it from the plugin's config.
+        gender = key.getString("gender", null);
         waypoints.load(key);
     }
 
@@ -454,13 +457,17 @@ public class GeminiNPCTrait extends Trait {
      * @return the processed persona string
      */
     private String getPersonaString(String pname) {
-        Persona p = Plugin.getInstance().personae.get(pname);
+        Persona persona = Plugin.getInstance().personae.get(pname);
         String s;
-        if (p == null) {
+        if (persona == null) {
             // if we don't have a persona, use the default.
             s = DEFAULT_PERSONA;
+            if(gender==null)    // no gender given yet
+                gender = plugin.defaultGender;  // there's no persona to get the default; use the plugin
         } else {
-            s = p.generateString(this);
+            if(gender==null)    // no gender given yet
+                gender = persona.defaultGender; // we can get the gender from the persona
+            s = persona.generateString(this);
         }
         return s;
     }

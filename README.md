@@ -48,6 +48,27 @@ in life.
 If you talk to the bot after assigning the trait but before setting its persona, you'll get the rather
 bland default persona.
 
+### YAML persona files
+Persona files can be plain text as above, but they can also be YAML files. The structure of such a file
+is:
+```
+string: |
+    This is my persona string. It can be multiple lines.
+
+# "You are {{gender}}" is prepended to the entire persona string. This sets the {{gender}} for
+# an NPC if none is specified with the "/gemini gender" command. It is optional - if omitted,
+# a value given in the main config.yml is used. If that's not present "non-binary" is used.
+
+default-gender: 
+
+# This is a list of template values that can be used in the persona string.
+
+template-values:
+    key: value
+    key2: value2
+```
+
+
 ### Common data
 
 Common data to all personae - perhaps describing the setting - can be added by putting a "common" file in the 
@@ -81,6 +102,33 @@ cannot be chosen multiple times.
 
 Remember that this code only runs once, so if you want to change the template values, you'll need to reload the NPCs
 with `/gemini reload` or restart the server.
+
+## A templated YAML persona example
+Here's an example of a YAML persona file that uses the templating engine. It uses the `pick` function to randomly
+choose an item from a list of personality traits. 
+```
+string: |
+        You are a soldier, patrolling for monsters.
+        {{pick(random_personality_features,2,"\n")}}
+
+template-values:
+    random_personality_features:
+        - You really like tea.
+        - You tend to ramble in your speech.
+        - You dislike daylight and prefer the dark.
+        - You are scared of monsters.
+        - You are plain-spoken.
+        - You like working in the forge.
+        - You don't like being outside, because of the dirt.
+        - You have a tendency to shout.
+        - You tend to ramble in your speech.
+        - You are rather fed up with this place.
+        - You are an agent of Chaos.
+        - You love the bees.
+        - You are a little too fond of bad puns.
+        - You are a little too fond of swearing.
+```
+
 
 ## What is sent
 
