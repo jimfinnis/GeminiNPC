@@ -905,11 +905,11 @@ public class GeminiNPCTrait extends Trait {
     /**
      * Show debugging data
      */
-    void showInfo(CallInfo c){
-        c.msg("NPC "+getNPC().getName());
-        c.msg("  org.pale.gemininpc.Persona: "+personaName);
+    void showInfo(CallInfo c) {
+        c.msg("NPC " + getNPC().getName());
+        c.msg("  org.pale.gemininpc.Persona: " + personaName);
         c.msg("  Waypoints:");
-        for(String name:waypoints.getWaypointNames()) {
+        for (String name : waypoints.getWaypointNames()) {
             try {
                 Waypoint w = waypoints.getWaypoint(name);
                 c.msg("    " + name + " : " + w.toString());
@@ -918,9 +918,15 @@ public class GeminiNPCTrait extends Trait {
             }
         }
         c.msg("Recently seen players:");
-        for(var entry: recentlySeenPlayers.getMap().entrySet()){
-            c.msg("  "+entry.getKey()+" : "+entry.getValue().timeUntilExpiry());
+        for (var entry : recentlySeenPlayers.getMap().entrySet()) {
+            c.msg("  " + entry.getKey() + " : " + entry.getValue().timeUntilExpiry());
         }
 
+        if (npc.getNavigator().isNavigating()) {
+            c.msg("  Navigator target: " + npc.getNavigator().getTargetAsLocation());
+            c.msg("  Path strategy: " + npc.getNavigator().getPathStrategy().getCurrentDestination());
+        } else {
+            c.msg("  Not navigating");
+        }
     }
 }

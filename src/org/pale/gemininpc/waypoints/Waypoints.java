@@ -90,11 +90,12 @@ public class Waypoints {
         if(w==null)throw new Exception("No such waypoint "+name);
         final Location loc = new Location(t.getNPC().getEntity().getWorld(), w.x+0.5, w.y, w.z+0.5);
         t.getNPC().getNavigator().setTarget(loc);
+        Plugin.log("Target set - "+t.getNPC().getFullName()+" to waypoint "+name+" at "+loc);
         var p = t.getNPC().getNavigator().getLocalParameters();
         p.range((float)loc.distance(t.getNPC().getEntity().getLocation())+5.0f);
         p.stuckAction( (npc1, navigator) -> {
             Plugin.log("Teleporting "+npc1.getFullName()+" to waypoint "+name);
-            navigator.cancelNavigation();
+            // navigator.cancelNavigation();
             // if we are stuck, we should just teleport to the waypoint
             t.getNPC().teleport(loc.add(0,1,0), PlayerTeleportEvent.TeleportCause.PLUGIN);
             return true;
