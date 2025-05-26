@@ -3,6 +3,7 @@ package org.pale.gemininpc;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
 import com.google.gson.*;
 import net.citizensnpcs.api.CitizensAPI;
@@ -159,7 +160,7 @@ public class GeminiNPCTrait extends Trait {
             if(nav.getPathStrategy()!=null)
                 nav.getPathStrategy().stop();   // double just in case!
 
-            if(dist>5.0) {
+            if(dist>2.0) {
                 // emergency teleport. If we didn't get there, or the system claims we got there but we're still
                 // a fair distance away, TP to it. Hate this.
                 npc.teleport(navTarget.add(0, 1, 0), PlayerTeleportEvent.TeleportCause.PLUGIN);
@@ -171,6 +172,7 @@ public class GeminiNPCTrait extends Trait {
     public void setGender(String s){
         gender = s;
     }
+
 
 
 
@@ -622,6 +624,37 @@ public class GeminiNPCTrait extends Trait {
 
     JsonObject prevContext = null;
 
+    private static Set<Biome> biomesFromStrings(List<String> s) {
+        return s.stream()
+                .map(b -> {
+                    try {
+                        return Biome.valueOf(b);
+                    } catch (IllegalArgumentException e) {
+                        Plugin.log("Unknown biome: " + b);
+                        return Biome.PLAINS;
+                    }
+                })
+                .collect(Collectors.toSet());
+    }
+
+    final Set<Biome> coldBiomes = biomesFromStrings(List.of(
+            "FROZEN_OCEAN", "DEEP_FROZEN_OCEAN", "SNOWY_BEACH", "SNOWY_PLAINS",
+            "SNOWY_SLOPES", "SNOWY_TAIGA"));
+
+    final Set<Biome> coldAbove100 = biomesFromStrings(List.of(
+            "WINDSWEPT_GRAVELLY_HILLS", "WINDSWEPT_HILLS", "WINDSWEPT_FOREST", "STONY_SHORE",
+            "DRIPSTONE_CAVES"
+    ));
+
+    final Set<Biome> coldAbove160 = biomesFromStrings(List.of(
+            "TAIGA", "OLD_GROWTH_SPRUCE_TAIGA"
+    ));
+
+    final Set<Biome> coldAbove200 = biomesFromStrings(List.of(
+            "OLD_GROWTH_PINE_TAIGA"
+    ));
+
+
     /**
      * Get the context (environment, inventory etc.) as a JSON object, leaving out unchanged elements
      *
@@ -651,26 +684,23 @@ public class GeminiNPCTrait extends Trait {
 
             // I need to tell if it's snow or rain.
             // this is a really rough method - it seems pretty impossible to do it properly.
+
+
             Biome b = w.getBiome(loc);
             boolean isSnow = false;  // if stormy, is it snow or rain?
             // get altitude of npc
             double y = loc.getY();
-            switch (b) {  // ugh.
-                case FROZEN_OCEAN, DEEP_FROZEN_OCEAN, SNOWY_BEACH, SNOWY_PLAINS, SNOWY_SLOPES, SNOWY_TAIGA:
-                    isSnow = true;
-                    break;
-                case WINDSWEPT_GRAVELLY_HILLS, WINDSWEPT_HILLS, WINDSWEPT_FOREST, STONY_SHORE, DRIPSTONE_CAVES:
-                    if (y > 120.0) isSnow = true;
-                    break;
-                case TAIGA, OLD_GROWTH_SPRUCE_TAIGA:
-                    if (y > 160.0) isSnow = true;
-                    break;
-                case OLD_GROWTH_PINE_TAIGA:
-                    if (y > 200.0) isSnow = true;
-                    break;
-                default:
-                    break;
+
+            if( coldBiomes.contains(b)) {
+                isSnow = true; // snow biome
+            } else if (coldAbove200.contains(b) && y > 200) {
+                isSnow = true; // above 200 in a cold biome
+            } else if (coldAbove160.contains(b) && y > 160) {
+                isSnow = true; // above 160 in a cold biome
+            } else if (coldAbove100.contains(b) && y > 100) {
+                isSnow = true; // above 100 in a cold biome
             }
+
             String weatherString = "clear";
             if (timeString.equals("midnight") || timeString.equals("night"))
                 weatherString = "dark";
@@ -927,6 +957,9 @@ public class GeminiNPCTrait extends Trait {
             c.msg("  Path strategy: " + npc.getNavigator().getPathStrategy().getCurrentDestination());
         } else {
             c.msg("  Not navigating");
+            if(navTarget != null) {
+                c.msg("  Ooops - still have nav target: " + navTarget);
+            }
         }
     }
 }

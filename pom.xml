@@ -6,7 +6,7 @@
   <groupId>org.pale</groupId>
   <artifactId>gemininpc</artifactId>
   <packaging>jar</packaging>
-  <version>0.0.0</version>
+  <version>0.0.1</version>
   <properties>
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
@@ -31,37 +31,30 @@
     <dependency>
       <groupId>org.spigotmc</groupId>
       <artifactId>spigot-api</artifactId>
-      <version>1.18.2-R0.1-SNAPSHOT</version>
+      <version>1.21.4-R0.1-SNAPSHOT</version>
       <scope>provided</scope>
     </dependency>
     <!--plugins we need to link against, in the server's plugins dir (or the project root, as I've done it here)-->
     <dependency>
       <groupId>net.citizensnpcs</groupId>
       <artifactId>api</artifactId>
-      <version>2.0.27</version>
+      <version>2.0.38</version>
       <scope>system</scope>
-      <systemPath>${server.plugindir}/Citizens-2.0.29-b2511.jar</systemPath>
+      <systemPath>${server.plugindir}/Citizens-2.0.38-b3801.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>org.pale</groupId>
       <artifactId>jcfutils</artifactId>
-      <version>1.1.1</version>
+      <version>1.1.2</version>
       <scope>system</scope>
-      <systemPath>${server.plugindir}/jcfutils-1.1.1.jar</systemPath>
+      <systemPath>${server.plugindir}/jcfutils-1.1.2.jar</systemPath>
     </dependency>
     <dependency>
       <groupId>org.mcmonkey</groupId>
       <artifactId>sentinel</artifactId>
-      <version>2.5.0-SNAPSHOT-b461</version>
+      <version>2.9.0</version>
       <scope>system</scope>
-      <systemPath>${server.plugindir}/Sentinel-2.5.0-SNAPSHOT-b461.jar</systemPath>
-    </dependency>
-    <dependency>
-      <groupId>net.livecar.nuttyworks.npc_destinations</groupId>
-      <artifactId>NPC_Destinations</artifactId>
-      <version>2_6_11</version>
-      <scope>system</scope>
-      <systemPath>${server.plugindir}/NPC_Destinations-2_6_11.jar</systemPath>
+      <systemPath>${server.plugindir}/Sentinel-2.9.2-SNAPSHOT-b527.jar</systemPath>
     </dependency>
     <dependency>
     <groupId>com.google.genai</groupId>

@@ -2,9 +2,6 @@
 package org.pale.gemininpc;
 
 import com.google.genai.Client;
-import io.marioslab.basis.template.Template;
-import io.marioslab.basis.template.TemplateContext;
-import io.marioslab.basis.template.TemplateLoader;
 import net.citizensnpcs.api.CitizensAPI;
 
 import java.io.IOException;
@@ -29,11 +26,8 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 
 import org.jetbrains.annotations.NotNull;
-import org.mcmonkey.sentinel.SentinelTrait;
 import org.pale.gemininpc.Command.*;
-import org.pale.gemininpc.plugininterfaces.NPCDestinations;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
-import org.pale.gemininpc.utils.TemplateFunctions;
 import org.pale.gemininpc.waypoints.Waypoint;
 import org.pale.gemininpc.waypoints.Waypoints;
 
@@ -56,7 +50,6 @@ public class Plugin extends JavaPlugin implements Listener {
     static final int TICK_RATE = 20;
     public String defaultGender = "non-binary";
     // interfaces to other plugins
-    NPCDestinations ndPlugin;
     Sentinel sentinelPlugin;
 
     /**
@@ -106,7 +99,6 @@ public class Plugin extends JavaPlugin implements Listener {
         }
 
         // construct interfaces to other plugins
-        ndPlugin = new NPCDestinations();
         sentinelPlugin = new Sentinel();
 
         //Register.

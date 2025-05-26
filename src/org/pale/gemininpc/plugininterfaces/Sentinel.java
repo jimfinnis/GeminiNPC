@@ -58,7 +58,7 @@ public class Sentinel extends ExternalPluginInterface {
 			
 			
 			double maxh = Objects.requireNonNull(t.getLivingEntity()
-					.getAttribute(Attribute.GENERIC_MAX_HEALTH))
+					.getAttribute(Attribute.MAX_HEALTH))
 					.getDefaultValue();
 			double h = t.getLivingEntity().getHealth();
 			
