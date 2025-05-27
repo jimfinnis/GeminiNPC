@@ -57,9 +57,6 @@ public class Plugin extends JavaPlugin implements Listener {
      * ones all over the place!
      */
     public static Plugin getInstance() {
-        if (instance == null)
-            throw new RuntimeException(
-                    "Attempt to get plugin when it's not enabled");
         return instance;
     }
 
@@ -73,7 +70,6 @@ public class Plugin extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
-        instance = null;
         getLogger().info("GeminiNPC has been disabled");
     }
 

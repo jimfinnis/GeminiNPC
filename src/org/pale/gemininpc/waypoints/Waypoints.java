@@ -1,5 +1,6 @@
 package org.pale.gemininpc.waypoints;
 
+import net.citizensnpcs.api.ai.Navigator;
 import net.citizensnpcs.api.util.DataKey;
 import org.bukkit.Location;
 import org.bukkit.event.player.PlayerTeleportEvent;
@@ -88,18 +89,28 @@ public class Waypoints {
         Waypoint w = waypoints.get(name);
         // wonder what this does in a different world???
         if(w==null)throw new Exception("No such waypoint "+name);
+        Navigator navigator = t.getNPC().getNavigator();
         final Location loc = new Location(t.getNPC().getEntity().getWorld(), w.x+0.5, w.y, w.z+0.5);
-        t.getNPC().getNavigator().setTarget(loc);
+        var p = navigator.getLocalParameters();
+        // p.range((float)loc.distance(t.getNPC().getEntity().getLocation())+5.0f);
+        p.range(100.0f);
+
+        if(!navigator.canNavigateTo(loc)){
+            Plugin.log("Cannot navigate to waypoint "+name+" at "+loc+" from "+t.getNPC().getEntity().getLocation());
+        }
+
+        navigator.setTarget(loc);
         Plugin.log("Target set - "+t.getNPC().getFullName()+" to waypoint "+name+" at "+loc);
-        var p = t.getNPC().getNavigator().getLocalParameters();
-        p.range((float)loc.distance(t.getNPC().getEntity().getLocation())+5.0f);
+        /*
         p.stuckAction( (npc1, navigator) -> {
-            Plugin.log("Teleporting "+npc1.getFullName()+" to waypoint "+name);
-            // navigator.cancelNavigation();
+            Plugin.log("STUCK. Teleporting "+npc1.getFullName()+" to waypoint "+name+" at "+loc);
+            navigator.cancelNavigation();
             // if we are stuck, we should just teleport to the waypoint
             t.getNPC().teleport(loc.add(0,1,0), PlayerTeleportEvent.TeleportCause.PLUGIN);
             return true;
         });
+
+         */
         return loc;
     }
 

@@ -149,6 +149,7 @@ public class GeminiNPCTrait extends Trait {
     NavCompletionFunction navCompletionHandler;
 
     void navComplete(NavCompletionCode navCompletionCode) {
+        Plugin.log("Navigator completed with code: " + navCompletionCode.label);
         if(navCompletionHandler != null) {
             Navigator nav = npc.getNavigator();
             Plugin.log("Navigator navigating:"+nav.isNavigating()+", strategydest:"+nav.getPathStrategy().getCurrentDestination());
@@ -163,6 +164,7 @@ public class GeminiNPCTrait extends Trait {
             if(dist>2.0) {
                 // emergency teleport. If we didn't get there, or the system claims we got there but we're still
                 // a fair distance away, TP to it. Hate this.
+                Plugin.log("Navigator did not arrive at destination, teleporting to " + navTarget);
                 npc.teleport(navTarget.add(0, 1, 0), PlayerTeleportEvent.TeleportCause.PLUGIN);
             }
             navTarget = null;
