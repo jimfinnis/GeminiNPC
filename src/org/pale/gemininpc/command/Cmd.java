@@ -1,4 +1,4 @@
-package org.pale.gemininpc.Command;
+package org.pale.gemininpc.command;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

@@ -1,4 +1,4 @@
-package org.pale.gemininpc.Command;
+package org.pale.gemininpc.command;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;

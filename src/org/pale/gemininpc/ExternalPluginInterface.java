@@ -2,7 +2,7 @@ package org.pale.gemininpc;
 
 public class ExternalPluginInterface {
 	org.bukkit.plugin.Plugin plugin;
-	private String name;
+	final private String name;
 	
 	public boolean isValid(){
 		return plugin!=null;
@@ -13,11 +13,12 @@ public class ExternalPluginInterface {
 	 * e.g. "2.0.4" > "1.5" > "1.4" > "0.0".
 	 * @param required the required version
 	 * @param level the usage level (there could be several, but the minimum should be called "usage").
-	 * @return
+	 * @return true if the version is OK, false if not.
 	 */
+	@SuppressWarnings("SameParameterValue")
 	boolean isVersionOK(String required,String level){
 		String pvn = plugin.getDescription().getVersion();
-		String vn = pvn.replaceAll("[^0-9\\.]", ""); // remove everything that isn't part of a version number.
+		String vn = pvn.replaceAll("[^0-9.]", ""); // remove everything that isn't part of a version number.
 		Plugin.log("Version before ["+pvn+"] and after repl ["+vn+"]");
 		String[] version = vn.split("\\.");
 		String[] mvarray = required.split("\\.");

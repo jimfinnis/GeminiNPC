@@ -1,7 +1,6 @@
 package org.pale.gemininpc.utils;
 
 import io.marioslab.basis.template.TemplateContext;
-import org.mcmonkey.sentinel.SentinelTrait;
 import org.pale.gemininpc.GeminiNPCTrait;
 
 import java.util.ArrayList;
@@ -12,7 +11,7 @@ import java.util.Random;
  * Useful functions for templates wrapped in a class.
  */
 public class TemplateFunctions {
-    GeminiNPCTrait trait;
+    final GeminiNPCTrait trait;
     Random prng;
     
     public TemplateFunctions(GeminiNPCTrait trait) {

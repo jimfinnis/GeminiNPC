@@ -1,4 +1,4 @@
-package org.pale.gemininpc.Command;
+package org.pale.gemininpc.command;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -15,10 +15,10 @@ import org.pale.gemininpc.Plugin;
 
 public class Registry {
     class Entry {
-        String name;
-        String permission;
-        Method m;
-        Object obj;
+        final String name;
+        final String permission;
+        final Method m;
+        final Object obj;
         private final Cmd cmd;
         
         

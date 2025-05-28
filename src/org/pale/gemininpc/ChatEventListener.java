@@ -28,7 +28,7 @@ import java.util.Map;
  * @author white
  */
 public final class ChatEventListener implements Listener {
-    Plugin plugin;
+    final Plugin plugin;
 
     public ChatEventListener(Plugin p) {
         plugin = p;
@@ -69,7 +69,7 @@ public final class ChatEventListener implements Listener {
     // be possible in more recent versions of Bukkit using getDamageSource.
 
     // I'll also track who each NPC damaged and when
-    Map<Entity, GeminiNPCTrait> damageMap = new HashMap<>();    // for a given mob, who damaged it?
+    final Map<Entity, GeminiNPCTrait> damageMap = new HashMap<>();    // for a given mob, who damaged it?
 
     @EventHandler
     public void onEntityDamage(EntityDamageByEntityEvent event){

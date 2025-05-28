@@ -9,6 +9,7 @@ import java.util.*;
 import java.nio.file.Path;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.stream.Stream;
 
 import net.citizensnpcs.api.npc.NPC;
 import org.bukkit.Bukkit;
@@ -26,7 +27,7 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 
 import org.jetbrains.annotations.NotNull;
-import org.pale.gemininpc.Command.*;
+import org.pale.gemininpc.command.*;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
 import org.pale.gemininpc.waypoints.Waypoint;
 import org.pale.gemininpc.waypoints.Waypoints;
@@ -40,7 +41,7 @@ public class Plugin extends JavaPlugin implements Listener {
     static final String ROOTCMDNAME = "gemini";
     public String model; // the model to use for Gemini AI - visible for the trait
     public Client client; // the client for the AI API - visible for the trait
-    EventRateTracker eventRateTracker = new EventRateTracker();
+    final EventRateTracker eventRateTracker = new EventRateTracker();
     int sched;  // scheduler handle
     int request_count = 0;   // AI request ctr
     boolean showSystemInstructions; // config option
@@ -160,7 +161,7 @@ public class Plugin extends JavaPlugin implements Listener {
      * replacement values - often strings but sometimes not (e.g. lists of strings are permitted).
      * They are applied to persona files when the persona is set on the NPC.
      */
-    Map<String, Object> templateValues = new HashMap<>();
+    final Map<String, Object> templateValues = new HashMap<>();
     String common; // all personae prefixed by this
 
     /**
@@ -203,8 +204,9 @@ public class Plugin extends JavaPlugin implements Listener {
             } else {
                 log(dirListName+" directory: "+p);
             }
-            try {
-                Files.list(p).forEach(f -> {
+            try(Stream<Path> entries = Files.list(p)) {
+                // for each file in the directory, run the function
+                entries.forEach(f -> {
                     String name = f.getFileName().toString();
                     function.run(name, f);
                 });
@@ -313,7 +315,7 @@ public class Plugin extends JavaPlugin implements Listener {
     }
 
     // this is a list of all the NPCs which have the trait
-    Set<NPC> chatters = new HashSet<>();
+    final Set<NPC> chatters = new HashSet<>();
 
     public void addChatter(NPC npc) {
         chatters.add(npc);
@@ -394,6 +396,7 @@ public class Plugin extends JavaPlugin implements Listener {
      * Commands
      */
 
+    @SuppressWarnings("unused")
     @Cmd(desc = "set the persona for an NPC", argc = 1, cz = true)
     public void persona(CallInfo c) {
         String persona = c.getArgs()[0];
@@ -409,6 +412,7 @@ public class Plugin extends JavaPlugin implements Listener {
     }
 
 
+    @SuppressWarnings("unused")
     @Cmd(desc = "show help for a command or list commands", usage = "[<command name>]")
     public void help(CallInfo c) {
         if (c.getArgs().length == 0) {
@@ -418,6 +422,7 @@ public class Plugin extends JavaPlugin implements Listener {
         }
     }
 
+    @SuppressWarnings("unused")
     @Cmd(desc = "reload all config data and personae (will reinitialise all chats)", argc = 0)
     public void reload(CallInfo c) {
         reloadConfig();
@@ -434,6 +439,7 @@ public class Plugin extends JavaPlugin implements Listener {
         }
     }
 
+    @SuppressWarnings("unused")
     @Cmd(desc = "list all available personae", argc = 0)
     public void list(CallInfo c) {
         c.msg("Available personae:");
@@ -442,6 +448,7 @@ public class Plugin extends JavaPlugin implements Listener {
         }
     }
 
+    @SuppressWarnings("unused")
     @Cmd(desc="list all NPCs with a persona", argc=0)
     public void npcs(CallInfo c) {
         c.msg("NPCs with a persona:");
@@ -451,6 +458,7 @@ public class Plugin extends JavaPlugin implements Listener {
         }
     }
 
+    @SuppressWarnings("unused")
     @Cmd(desc="Get general resource usage info", argc=0)
     public void usage(CallInfo c) {
         c.msg("GeminiNPC usage:");
@@ -460,6 +468,7 @@ public class Plugin extends JavaPlugin implements Listener {
         c.msg("  NPCs with personae: "+chatters.size());
     }
 
+    @SuppressWarnings("unused")
     @Cmd(desc="Get info on an NPC", argc=0, cz=true)
     public void info(CallInfo c){
         c.getCitizen().showInfo(c);
@@ -482,7 +491,8 @@ public class Plugin extends JavaPlugin implements Listener {
         return sb.toString();
     }
 
-    @Cmd(desc="Set a waypoint for the current NPC at your current location", argc=-1, usage="[name] [desc..]", cz=true)
+    @SuppressWarnings("unused")
+    @Cmd(desc="Set a waypoint for the current NPC at your current location", usage="[name] [desc..]", cz=true)
     public void wp(CallInfo c){
         String name = c.getArgs()[0];
         GeminiNPCTrait t = c.getCitizen();
@@ -493,6 +503,7 @@ public class Plugin extends JavaPlugin implements Listener {
                 c.getPlayer().getLocation().getBlockZ());
     }
 
+    @SuppressWarnings("unused")
     @Cmd(desc="Delete a named waypoint", argc=1, usage="[name]", cz=true)
     public void wpdel(CallInfo c){
         String name = c.getArgs()[0];
@@ -504,6 +515,7 @@ public class Plugin extends JavaPlugin implements Listener {
         }
     }
 
+    @SuppressWarnings("unused")
     @Cmd(desc="Change an NPC waypoint to the player's location", argc=1, usage="[name]", cz=true)
     public void wploc(CallInfo c){
         String name = c.getArgs()[0];
@@ -520,7 +532,8 @@ public class Plugin extends JavaPlugin implements Listener {
         }
     }
 
-    @Cmd(desc="Change an NPC waypoint description", argc=-1, usage="[name] [desc...]", cz=true)
+    @SuppressWarnings("unused")
+    @Cmd(desc="Change an NPC waypoint description", usage="[name] [desc...]", cz=true)
     public void wpdesc(CallInfo c){
         String name = c.getArgs()[0];
         GeminiNPCTrait t = c.getCitizen();
@@ -532,6 +545,7 @@ public class Plugin extends JavaPlugin implements Listener {
         }
     }
 
+    @SuppressWarnings("unused")
     @Cmd(desc="Make an NPC path to the named waypoint", argc=1, usage="[name]", cz=true)
     public void go(CallInfo c){
         String name = c.getArgs()[0];
@@ -546,13 +560,15 @@ public class Plugin extends JavaPlugin implements Listener {
         }
     }
 
-    @Cmd(desc="show number of API requests made",argc=0,player=false,cz=false)
+    @SuppressWarnings("unused")
+    @Cmd(desc="show number of API requests made",argc=0)
     public void reqs(CallInfo c){
         c.msg(ChatColor.AQUA+"Requests total since boot: "+request_count);
         c.msg(ChatColor.AQUA+"Requests in last minute: "+eventRateTracker.getEventsInLastMinute());
     }
 
-    @Cmd(desc="toggle debugging for NPC (mainly paths)", cz=true, player=false, argc=0)
+    @SuppressWarnings("unused")
+    @Cmd(desc="toggle debugging for NPC (mainly paths)", cz=true, argc=0)
     public void debug(CallInfo c){
         GeminiNPCTrait t = c.getCitizen();
         if(t!=null){
@@ -561,18 +577,21 @@ public class Plugin extends JavaPlugin implements Listener {
         }
     }
 
-    @Cmd(desc="temporarily disable calls to the AI model",player=false,cz=false,argc=0)
+    @SuppressWarnings("unused")
+    @Cmd(desc="temporarily disable calls to the AI model",argc=0)
     public void disable(CallInfo c){
         c.msg(ChatColor.AQUA+"Disabling AI model calls");
         callsEnabled = false;
     }
 
-    @Cmd(desc="enable calls to the AI model",player=false,cz=false,argc=0)
+    @SuppressWarnings("unused")
+    @Cmd(desc="enable calls to the AI model",argc=0)
     public void enable(CallInfo c){
         c.msg(ChatColor.AQUA+"Enable AI model calls");
         callsEnabled = true;
     }
 
+    @SuppressWarnings("unused")
     @Cmd(desc="set the gender", cz=true,argc=1)
     public void gender(CallInfo c){
         String gender = c.getArgs()[0];
@@ -580,6 +599,7 @@ public class Plugin extends JavaPlugin implements Listener {
         c.getCitizen().setGender(gender);
     }
 
+    @SuppressWarnings("unused")
     @Cmd(desc="quick set of persona and/or gender, e.g. qs Boris g=male p=soldier1")
     public void qs(CallInfo c){
         String[] args = c.getArgs();
@@ -591,7 +611,7 @@ public class Plugin extends JavaPlugin implements Listener {
         GeminiNPCTrait t = chatters.stream()
                 .filter(npc -> npc.getName().equals(name))
                 .findFirst()
-                .map(npc -> getTraitFor(npc))
+                .map(Plugin::getTraitFor)
                 .orElse(null);
         if(t==null){
             c.msg(ChatColor.RED+"No such NPC "+name);

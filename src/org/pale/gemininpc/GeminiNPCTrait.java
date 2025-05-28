@@ -30,7 +30,7 @@ import com.google.genai.types.GenerateContentResponse;
 import com.google.genai.types.Part;
 import com.google.genai.types.Content;
 import org.mcmonkey.sentinel.SentinelTrait;
-import org.pale.gemininpc.Command.CallInfo;
+import org.pale.gemininpc.command.CallInfo;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
 import org.pale.gemininpc.utils.TransientNotification;
 import org.pale.gemininpc.utils.TransientNotificationMap;
@@ -70,7 +70,7 @@ public class GeminiNPCTrait extends Trait {
         }
     }
 
-    Plugin plugin;           // useful pointer back to the plugin shared by all traits
+    final Plugin plugin;           // useful pointer back to the plugin shared by all traits
     private int tickint = 0;        // a counter to slow down updates
     public long timeSpawned = 0;    // ticks since spawn
     Location navTarget;     // current path destination using our waypoints (not Chatcitizen's) or null
@@ -86,8 +86,8 @@ public class GeminiNPCTrait extends Trait {
     // The keys we will use are "visible" and "heard"
 
     record MonsterData(String m, double dist) {}
-    TransientNotification<MonsterData> nearestMonster = new TransientNotification<>(30);
-    TransientNotification<MonsterData> nearestVisibleMonster = new TransientNotification<>(20);
+    final TransientNotification<MonsterData> nearestMonster = new TransientNotification<>(30);
+    final TransientNotification<MonsterData> nearestVisibleMonster = new TransientNotification<>(20);
 
     // range of entity scanner
     static final double NEARBY_ENTITIES_SCAN_DIST = 10;
@@ -107,17 +107,17 @@ public class GeminiNPCTrait extends Trait {
 
     // players which we have recently seen hang around in this for a while. The message type is "object"
     // because we don't care what it is - it's not used.
-    TransientNotificationMap<Object> recentlySeenPlayers = new TransientNotificationMap<>(60);
+    final TransientNotificationMap<Object> recentlySeenPlayers = new TransientNotificationMap<>(60);
 
     // throttles the infrequent update on individual NPCs
-    TransientNotification<Object> updateInfrequentRecently = new TransientNotification<>(60);
+    final TransientNotification<Object> updateInfrequentRecently = new TransientNotification<>(60);
 
     // The "chat" part of the GenAI api is synchronous, so we use a queue and a thread to
     // make it non-blocking. Requests are sent to the AI in a thread, and when the response
     // is returned it is added to this queue. We don't need to store the player, because the
     // NPC will just "say" the response to all players in range. The queue is read inside the
     // update method by polling - not ideal, but it's very quick and the update infrequent.
-    ConcurrentLinkedQueue<String> queue = new ConcurrentLinkedQueue<>();
+    final ConcurrentLinkedQueue<String> queue = new ConcurrentLinkedQueue<>();
 
     // this is the Chat API object - it's created the first time you call the respondTo method,
     // or when it's called after you change the persona (which sets this to zero)
@@ -127,8 +127,9 @@ public class GeminiNPCTrait extends Trait {
     static final String DEFAULT_PERSONA = "You have no memory of who or what you are.";
 
     String personaName = "default"; // the name of the persona
-    Waypoints waypoints = new Waypoints();
     String gender = null;
+
+    final Waypoints waypoints = new Waypoints();
 
     /**
      * This gets called very infrequently, randomly. And never more than the per-NPC
@@ -149,7 +150,6 @@ public class GeminiNPCTrait extends Trait {
     NavCompletionFunction navCompletionHandler;
 
     void navComplete(NavCompletionCode navCompletionCode) {
-        Navigator nav = npc.getNavigator();
         if(navTarget != null) {
             // if navTarget is null, this is an navigation target set via a pathTo call. We will
             // call a completion handler if one is available. We also teleport if we didn't get
@@ -502,6 +502,7 @@ public class GeminiNPCTrait extends Trait {
      * @param dy range in y
      *
      */
+    @SuppressWarnings("SameParameterValue")
     private void updateNearbyEntities(double d, double dy){
         Set<NearbyPlayer> r = new HashSet<>();
         boolean nonNPCPresent = false;
@@ -629,7 +630,7 @@ public class GeminiNPCTrait extends Trait {
         return s.stream()
                 .map(b -> {
                     try {
-                        return Biome.valueOf(b);
+                        return Registry.BIOME.get(new NamespacedKey(Plugin.getInstance(), b));
                     } catch (IllegalArgumentException e) {
                         Plugin.log("Unknown biome: " + b);
                         return Biome.PLAINS;
@@ -686,21 +687,7 @@ public class GeminiNPCTrait extends Trait {
             // I need to tell if it's snow or rain.
             // this is a really rough method - it seems pretty impossible to do it properly.
 
-
-            Biome b = w.getBiome(loc);
-            boolean isSnow = false;  // if stormy, is it snow or rain?
-            // get altitude of npc
-            double y = loc.getY();
-
-            if( coldBiomes.contains(b)) {
-                isSnow = true; // snow biome
-            } else if (coldAbove200.contains(b) && y > 200) {
-                isSnow = true; // above 200 in a cold biome
-            } else if (coldAbove160.contains(b) && y > 160) {
-                isSnow = true; // above 160 in a cold biome
-            } else if (coldAbove100.contains(b) && y > 100) {
-                isSnow = true; // above 100 in a cold biome
-            }
+            boolean isSnow = isSnow(loc);
 
             String weatherString = "clear";
             if (timeString.equals("midnight") || timeString.equals("night"))
@@ -735,12 +722,12 @@ public class GeminiNPCTrait extends Trait {
         }
         var nearbyWp = waypoints.getNearWaypoint(loc, 100);
         if(nearbyWp!=null){
-            if(nearbyWp.distanceSquared<16){
-                root.addProperty("location", nearbyWp.name);
-                root.addProperty("location description", nearbyWp.waypoint.desc);
+            if(nearbyWp.distanceSquared() <16){
+                root.addProperty("location", nearbyWp.name());
+                root.addProperty("location description", nearbyWp.waypoint().desc);
             } else {
-                root.addProperty("nearby location",nearbyWp.name);
-                root.addProperty("nearby location description",nearbyWp.waypoint.desc);
+                root.addProperty("nearby location", nearbyWp.name());
+                root.addProperty("nearby location description", nearbyWp.waypoint().desc);
             }
         }
 
@@ -779,7 +766,28 @@ public class GeminiNPCTrait extends Trait {
         prevContext = root;
         return diffs;
     }
-    
+
+    private boolean isSnow(Location loc) {
+        boolean isSnow = false;  // if stormy, is it snow or rain?
+        World w = loc.getWorld();
+        if (w == null) return false;
+        Biome b = w.getBiome(loc);
+
+        // get altitude of npc
+        double y = loc.getY();
+
+        if( coldBiomes.contains(b)) {
+            isSnow = true; // snow biome
+        } else if (coldAbove200.contains(b) && y > 200) {
+            isSnow = true; // above 200 in a cold biome
+        } else if (coldAbove160.contains(b) && y > 160) {
+            isSnow = true; // above 160 in a cold biome
+        } else if (coldAbove100.contains(b) && y > 100) {
+            isSnow = true; // above 100 in a cold biome
+        }
+        return isSnow;
+    }
+
     // no sniggering at the back there. This gets a part from a text defined in the config.
     private Part getPartFromText(String textName){
         return Part.fromText(plugin.getText(textName));

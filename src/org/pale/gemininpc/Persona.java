@@ -19,7 +19,7 @@ public class Persona {
     public String name;     // the name of the persona
     public String string;   // this is the base persona string before templating
     public String defaultGender = null;   // the default gender for NPCs of this persona, overriding that in the config.yml
-    public Map<String, Object> templateValues = new HashMap<>(); // template values for this persona
+    final public Map<String, Object> templateValues = new HashMap<>(); // template values for this persona
 
     /**
      * Constructor for the org.pale.gemininpc.Persona class.

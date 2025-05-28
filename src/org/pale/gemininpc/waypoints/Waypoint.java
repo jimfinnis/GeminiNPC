@@ -5,9 +5,10 @@ import org.bukkit.Location;
 import static org.bukkit.Bukkit.getServer;
 
 public class Waypoint {
-    int x, y, z;
-    String world;
-    public String name;
+    final int x, y, z;
+    final String world;
+    final public String name;
+
     public String desc;    // description for use by the NPC
     Location loc;   // used to store more detailed positions; generated automatically if not present
 

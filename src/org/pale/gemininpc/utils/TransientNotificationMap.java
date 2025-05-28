@@ -7,7 +7,6 @@ import java.util.Map;
  * Transient notifications hang around for a few seconds, but then silently disappear. Consider when an NPC "hears"
  * a monster. We don't want it to immediately forget that, but we also don't want it to remember it forever.
  * There's a separate object for each type of notification.
- *
  * This class allows us to handle a group of such notifications, such as per-player "when did I last greet you" data.
  */
 public class TransientNotificationMap<MessageType> {
@@ -85,6 +84,7 @@ public class TransientNotificationMap<MessageType> {
      * Update the list of notifications. This will remove any that have expired. You don't need to call
      * this that often if has() is frequently called on all keys.
      */
+    @SuppressWarnings("unused")
     public void update(){
         notifications.values().removeIf(n -> !n.active());
     }

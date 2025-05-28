@@ -3,7 +3,6 @@ package org.pale.gemininpc.waypoints;
 import net.citizensnpcs.api.ai.Navigator;
 import net.citizensnpcs.api.util.DataKey;
 import org.bukkit.Location;
-import org.bukkit.event.player.PlayerTeleportEvent;
 import org.pale.gemininpc.GeminiNPCTrait;
 import org.pale.gemininpc.Plugin;
 
@@ -15,32 +14,34 @@ import static org.bukkit.Bukkit.getServer;
 
 public class Waypoints {
 
-    public class Exception extends java.lang.Exception {
+    public static class Exception extends java.lang.Exception {
         public Exception(String msg){
             super(msg);
         }
     }
 
-    Map<String, Waypoint> waypoints = new HashMap<>();
+    final Map<String, Waypoint> waypoints = new HashMap<>();
 
     public void add(String name, String world, String desc, int x, int y, int z) {
         Waypoint w = new Waypoint(world, name, desc, x, y, z);
         waypoints.put(name, w);
     }
 
-    public void add(String name, String desc, Location loc){
+    public void add(String name, String desc, Location loc) {
+        if(loc.getWorld()==null)
+            return;
         add(name, loc.getWorld().getName(), desc, loc.getBlockX(), loc.getBlockY(), loc.getBlockZ());
     }
 
     public void delete(String name) throws Exception {
         if(!waypoints.containsKey(name))
-            throw new Exception("Waypoint not found: "+name);
+            throw new Exception("Waypoint not found: " + name);
         waypoints.remove(name);
     }
 
     public Waypoint getWaypoint(String name) throws Exception {
         Waypoint w = waypoints.get(name);
-        if(w==null)throw new Exception("No such waypoint "+name);
+        if(w==null)throw new Exception("No such waypoint " + name);
         return w;
     }
 
@@ -88,7 +89,7 @@ public class Waypoints {
     public Location pathTo(GeminiNPCTrait t, String name) throws Exception {
         Waypoint w = waypoints.get(name);
         // wonder what this does in a different world???
-        if(w==null)throw new Exception("No such waypoint "+name);
+        if(w==null)throw new Exception("No such waypoint " + name);
         Navigator navigator = t.getNPC().getNavigator();
         final Location loc = new Location(t.getNPC().getEntity().getWorld(), w.x+0.5, w.y, w.z+0.5);
         var p = navigator.getLocalParameters();
@@ -114,16 +115,7 @@ public class Waypoints {
         return loc;
     }
 
-    public class NearWaypointResult {
-        public String name;
-        public double distanceSquared;
-        public Waypoint waypoint;
-
-        public NearWaypointResult(String name, double distanceSquared, Waypoint waypoint) {
-            this.name = name;
-            this.distanceSquared = distanceSquared;
-            this.waypoint = waypoint;
-        }
+    public record NearWaypointResult(String name, double distanceSquared, Waypoint waypoint) {
     }
 
     public NearWaypointResult getNearWaypoint(Location loc,double thresholdSquared) {
