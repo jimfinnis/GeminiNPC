@@ -149,19 +149,18 @@ public class GeminiNPCTrait extends Trait {
     NavCompletionFunction navCompletionHandler;
 
     void navComplete(NavCompletionCode navCompletionCode) {
-        Plugin.log("Navigator completed with code: " + navCompletionCode.label);
-        if(navCompletionHandler != null) {
-            Navigator nav = npc.getNavigator();
-            Plugin.log("Navigator navigating:"+nav.isNavigating()+", strategydest:"+nav.getPathStrategy().getCurrentDestination());
+        Navigator nav = npc.getNavigator();
+        if(navTarget != null) {
+            // if navTarget is null, this is an navigation target set via a pathTo call. We will
+            // call a completion handler if one is available. We also teleport if we didn't get
+            // there!
             double dist = npc.getStoredLocation().distance(navTarget);
-
-            navCompletionHandler.call(navCompletionCode, dist);
-            navCompletionHandler = null;
-            nav.cancelNavigation();   // just in case!
-            if(nav.getPathStrategy()!=null)
-                nav.getPathStrategy().stop();   // double just in case!
-
-            if(dist>2.0) {
+            if (debug) log_debug("Navigator completed with code: " + navCompletionCode.label + ", dist: " + dist);
+            if (navCompletionHandler != null) {
+                navCompletionHandler.call(navCompletionCode, dist);
+                navCompletionHandler = null;
+            }
+            if (dist > 2.0) {
                 // emergency teleport. If we didn't get there, or the system claims we got there but we're still
                 // a fair distance away, TP to it. Hate this.
                 Plugin.log("Navigator did not arrive at destination, teleporting to " + navTarget);
@@ -939,7 +938,7 @@ public class GeminiNPCTrait extends Trait {
      */
     void showInfo(CallInfo c) {
         c.msg("NPC " + getNPC().getName());
-        c.msg("  org.pale.gemininpc.Persona: " + personaName);
+        c.msg("  org.pale.gemininpc.Persona: " + personaName + "gender: "+gender);
         c.msg("  Waypoints:");
         for (String name : waypoints.getWaypointNames()) {
             try {
