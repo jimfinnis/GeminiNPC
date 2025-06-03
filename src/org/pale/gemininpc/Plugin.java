@@ -154,7 +154,8 @@ public class Plugin extends JavaPlugin implements Listener {
 
     // This is a map of persona name onto the persona string loaded from each file.
     public final Map<String, Persona> personae = new HashMap<>();
-    // This is a map of common texts used in the plugin.
+    // This is a map of common texts used in the plugin - not common templates; these are just variables
+    // and can't contain templates themselves.
     private final Map<String, String> texts = new HashMap<>();
     /**
      * These are the variables in the template system which can be replaced, and their
@@ -162,7 +163,6 @@ public class Plugin extends JavaPlugin implements Listener {
      * They are applied to persona files when the persona is set on the NPC.
      */
     final Map<String, Object> templateValues = new HashMap<>();
-    String common; // all personae prefixed by this
 
     /**
      * Used to read the contents of a file and warn if it fails, returning a string
@@ -221,22 +221,41 @@ public class Plugin extends JavaPlugin implements Listener {
         // load all of the personae - these are name:filename pairs, paths relative
         // to the Minecraft server directory. Each file contains a set of system
         // instructions for the AI.
-        // get the common persona data - this is a set of instructions that are common to all -
-        // and prepend to the data for each persona.
+
         ConfigurationSection ps = c.getConfigurationSection("main");
-        common = Objects.requireNonNull(ps).getString("common", "");
-        if (!common.isEmpty()) {
-            common = readFile(Paths.get(common), "");
+        if (ps == null) {
+            throw new RuntimeException("No main section in config");
         }
-        log("Common persona data is " + common.length() + " chars");
 
         defaultGender = ps.getString("default-gender","non-binary");
-
-        // various flags and that
         showSystemInstructions = ps.getBoolean("show-system-instructions", false);
         attackNotificationDuration = ps.getInt("attack-notification-duration", 20);
 
-        // now load the special template items - these are texts that used as tags in the persona data
+        // load the common templates - these can contain template variables themselves {{like}} {{this}}, and
+        // can be included in all persona templates with {{include "common_template_name"}}.
+
+        Map<String, String> commonTemplates = new HashMap<>();
+        processFilesInConfigDirectory(c, "common-template-directories",
+                (name, file) -> {
+                    String template = readFile(file, "");
+                    if (template != null) {
+                        // add the template to the template values
+                        commonTemplates.put(name, template);
+                    }
+                });
+        ConfigurationSection common_section = c.getConfigurationSection("common-templates");
+        if (common_section != null) {
+            for (String key : common_section.getKeys(false)) {
+                String value = common_section.getString(key);
+                if (value != null) {
+                    commonTemplates.put(key, value);
+                }
+            }
+        }
+        // then tell the persona system that the template loader should contain those templates
+        Persona.initialiseTemplateLoader(commonTemplates);
+
+        // now load the special template values - these are texts that used as variables in the persona data
 
         // First, for each file in the directories listed, add the contents of that file as a template value.
         processFilesInConfigDirectory(c, "template-value-directories",

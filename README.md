@@ -55,11 +55,10 @@ is:
 string: |
     This is my persona string. It can be multiple lines.
 
-# "You are {{gender}}" is prepended to the entire persona string. This sets the {{gender}} for
-# an NPC if none is specified with the "/gemini gender" command. It is optional - if omitted,
-# a value given in the main config.yml is used. If that's not present "non-binary" is used.
+# This sets the {{gender}} for an NPC if none is specified with the "/gemini gender" command.
+# It is optional - if omitted, a value given in the main config.yml is used. If that's not present "non-binary" is used.
 
-default-gender: 
+default-gender: non-binary
 
 # This is a list of template values that can be used in the persona string.
 
@@ -67,18 +66,6 @@ template-values:
     key: value
     key2: value2
 ```
-
-
-### Common data
-
-Common data to all personae - perhaps describing the setting - can be added by putting a "common" file in the 
-main section:
-```
-main:
-    common: plugins/GeminiNPC/common
-```
-This will be prepended to all the persona strings. Note that the template values `{{name}}` and `{{gender}}` are useful
-here, and there may be others that are handy. 
 
 ## Templating
 
@@ -108,6 +95,40 @@ If an item chosen by `pick` or `choose` it itself a list, then an item will be c
 while (in the case of `pick`) the list itself will be removed from the list of items to choose from. This means that
 you can create mutually exclusive items by having a list of lists. See the next section for an example.
 
+
+### Template inclusion for common data
+Often, a persona will have a lot of common text that is shared between many personae and
+you don't want to repeat it in every persona file. You can use the `include` function to include a file from any
+directory in the `common-template-directories` list. The file will be included at the point where the `include` function
+is called. For example, you could have this entry in your config file:
+```common-template-directories:
+    - plugins/GeminiNPC/common-templates
+```
+and then a file called `intro` in that directory with the following contents:
+```
+The setting is a fantasy world, where magic exists and people live in small villages. You are a friendly NPC,
+who is {{gender}}.
+```
+See below for more on the `gender` template value.
+
+and then in your persona file you could have:
+```string: |
+    {{include "intro"}}
+    You are a wizard, and have a fondness for the good things in life.
+```
+This would include the contents of the `common-templates/intro` file at the start of the persona string.
+
+## Gender
+The "gender" of an NPC can be set in three ways:
+1. By setting the gender in the NPC trait using the `/gemini gender` command. This will override the following two methods.
+2. By setting the `default-gender` in the persona file. This will be used if the first method is not used.
+3. By setting the `default-gender` in the main config file. This will be used if the first two methods are not used.
+
+Setting the gender does only one thing - it sets the `gender` template value, which can then be used in the persona
+through the templating system. The value is just a string and can be anything you like, but the default is
+"non-binary".
+   
+
 ## A templated YAML persona example
 
 Here's an example of a YAML persona file that uses the templating engine. It uses the `pick` function to randomly
@@ -116,6 +137,7 @@ used for mutually exclusive traits. The `pick` function will choose one of the s
 within that sublist.
 ```
 string: |
+        {{include "intro"}}
         You are a soldier, patrolling for monsters.
         {{pick(random_personality_features,2,"\n")}}
 
@@ -181,4 +203,28 @@ Most of what the context contains is obvious, but here are some notes:
 * `location` is a nearby waypoint name - GeminiNPC has its own waypoint system. NPCs are informed of their waypoints in the initial system instruction.
 * `location description` is a description of the waypoint.
 * `region` is information from the JCFUtils plugin's region mechanism - it gives the region name and description (if there is one).
+
+## Waypoints
+
+Each NPC has a set of waypoints. Each has a name and a description. The name is used to identify the waypoint, while the
+description is used to provide context to the AI model. The system instruction for the NPC will contain a list of waypoints
+and their descriptions, so the AI model can use them to generate appropriate responses. As noted above, the model will
+also receive the name and description of any nearby waypoint in the context.
+
+### Waypoint navigation
+
+If the NPC has waypoints, it will also be given text like this in the system instruction:
+```To go to a location, use the 'go locationname' command.```
+
+If the received response contains a command like this, the NPC will try to go to the waypoint with that name. This means
+that you can usually suggest that the NPC goes to a waypoint by saying something like "go to the tavern" or "go to the blacksmith". The NPC will
+then try to navigate to that waypoint.
+
+### Waypoint commands
+The following commands are available for waypoints:
+* `/gemini wp <name> <description>` - adds a new waypoint with the given name and description at the player's current location.
+* `/gemini wpdel <name>` - removes the waypoint with the given name.
+* `/gemini wpdesc <name> <description>` - changes the description of the waypoint with the given name.
+* `/gemini wploc <name>` - shows the location of the waypoint with the given name to the player's current location.
+
 

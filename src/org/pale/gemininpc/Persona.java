@@ -21,6 +21,23 @@ public class Persona {
     public String defaultGender = null;   // the default gender for NPCs of this persona, overriding that in the config.yml
     final public Map<String, Object> templateValues = new HashMap<>(); // template values for this persona
 
+    // this is the template loader that is used for all personae. We preload it with all the common stuff,
+    // and then load the persona string into it as "persona" for each persona separately.
+    static TemplateLoader.MapTemplateLoader tl = new TemplateLoader.MapTemplateLoader();
+
+    /**
+     * This method is called once at the start of the plugin to set up the template loader.
+     * It loads common texts as separate templates into the template loader, so they
+     * can be included.
+     * @param common a map containing common texts to be loaded into the template loader
+     */
+    static void initialiseTemplateLoader(Map<String, String> common) {
+        for(String key : common.keySet()) {
+            String value = common.get(key);
+            tl.set(key, value);
+        }
+    }
+
     /**
      * Constructor for the org.pale.gemininpc.Persona class.
      * @param name  the name of the file - this will become the name of the persona, with any .yml extension removed.
@@ -97,14 +114,12 @@ public class Persona {
             Plugin.log("Template variable: "+s+" = "+tc.get(s));
         }
 
-        // this seems cumbersome - we just want to run the templating engine on
-        // the data. Note that we're prepending the common text first, so the template
-        // engine can run on that!
-        TemplateLoader.MapTemplateLoader tl = new TemplateLoader.MapTemplateLoader();
-        tl.set("data", plugin.common+"\n"+string);
-        Template template = tl.load("data"); // ffs
+        // now we can set the persona string as a template
+        tl.set("persona", string);
+        // load the persona template, including any common templates that have been set up.
+        Template template = tl.load("persona"); // ffs
         String s= template.render(tc);
-        Plugin.log("Template applied to " + t.getNPC().getName() + " is " + s);
+        Plugin.log("Persona applied to " + t.getNPC().getName() + " is " + s);
         return s;
     }
 
