@@ -12,6 +12,12 @@ plugin, which provides a way to get information about regions in the world.
 It can also interface with the Sentinel trait, so you can tell the NPC 
 to guard particular players and follow them.
 
+## Not yet documented
+
+* interaction with the shop trait, including the "sold" command
+* the response/command system, which allows the NPC to respond to specific commands - and what those commands are
+
+
 ## Setup
 
 First, you'll need to set the model you want to use and the API key
@@ -76,6 +82,7 @@ The following template values are available:
 * `gender` - the gender of the NPC (settable with `/gemini gender` and defaulted from the `default-gender` setting in the main section
 of the config file)
 * `isSentinel` is true if the NPC has the Sentinel trait
+* `isShop` is true if the NPC has the Shop trait
 
 More templates values can be set in two ways:
 * add a string to the `template-values` section of the config file
@@ -228,3 +235,10 @@ The following commands are available for waypoints:
 * `/gemini wploc <name>` - shows the location of the waypoint with the given name to the player's current location.
 
 
+## Other random notes
+These are a bit disorganised! 
+
+* You can get help on commands by typing `/gemini help`.
+* If an NPC has the Shop trait, right clicking is disabled.
+* Right clicking on an NPC will otherwise give the item in the player's hand to the NPC, which will then
+  be added to the NPC's inventory. This is useful for giving items to NPCs. They will get a notification and respond.

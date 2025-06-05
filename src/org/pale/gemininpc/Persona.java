@@ -109,6 +109,7 @@ public class Persona {
         tc.set("name",t.getNPC().getName());
         tc.set("gender",t.gender);
         tc.set("isSentinel",t.getNPC().hasTrait(SentinelTrait.class));
+        tc.set("isShop", t.isShop());
 
         for(String s: tc.getVariables()){
             Plugin.log("Template variable: "+s+" = "+tc.get(s));

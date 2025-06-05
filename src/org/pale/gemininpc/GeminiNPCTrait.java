@@ -12,9 +12,11 @@ import net.citizensnpcs.api.trait.Trait;
 import net.citizensnpcs.api.trait.TraitName;
 import net.citizensnpcs.api.util.DataKey;
 
+import net.citizensnpcs.trait.ShopTrait;
 import org.bukkit.*;
 import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
+import org.bukkit.entity.Item;
 import org.bukkit.entity.Monster;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.Inventory;
@@ -58,6 +60,10 @@ public class GeminiNPCTrait extends Trait {
 
     void log_debug(String s){
         if(debug)Plugin.log(npc.getName()+ ": "+s);
+    }
+
+    public boolean isShop() {
+        return npc.hasTrait(ShopTrait.class);
     }
 
     enum NavCompletionCode {
@@ -301,6 +307,13 @@ public class GeminiNPCTrait extends Trait {
 
         // and send the message to the AI
         respondTo(p, "(gives you " + st.getType().name() + ")");
+    }
+
+    /**
+     * Respond to a player buying an item from an NPC with a shop
+     */
+    void onShopPurchase(Player p, String itemList){
+        respondTo(p, "(purchases " + itemList + ")");
     }
 
     /**

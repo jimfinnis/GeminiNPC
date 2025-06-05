@@ -4,6 +4,9 @@ import net.citizensnpcs.api.ai.event.NavigationCancelEvent;
 import net.citizensnpcs.api.ai.event.NavigationCompleteEvent;
 import net.citizensnpcs.api.event.NPCRightClickEvent;
 import net.citizensnpcs.api.npc.NPC;
+import net.citizensnpcs.trait.ShopTrait;
+import net.citizensnpcs.trait.shop.ItemAction;
+import net.citizensnpcs.trait.shop.NPCShopAction;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Entity;
@@ -14,8 +17,11 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.inventory.ItemStack;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -58,6 +64,9 @@ public final class ChatEventListener implements Listener {
         if (t == null) {
             return;
         }
+        if(t.isShop())
+            return;
+
         Plugin.log("click event on " + npc.getFullName() + "from player " + event.getClicker().getDisplayName());
         if (event.getNPC() == npc) {
             t.give(event.getClicker()); // give the item to the NPC
@@ -141,5 +150,49 @@ public final class ChatEventListener implements Listener {
         if(t != null) {
             t.navComplete(GeminiNPCTrait.NavCompletionCode.ARRIVED);
         }
+    }
+
+    @EventHandler
+    public static void shopPurchase(ShopTrait.NPCShopPurchaseEvent e) {
+        // getting the NPC out of the event is tricky. We're only interested in our NPCs, so we can
+        // iterate over all gemini NPCs and check if they have the trait.
+        for(NPC npc: Plugin.getInstance().chatters){
+            if(npc.hasTrait(GeminiNPCTrait.class) && npc.hasTrait(ShopTrait.class)) {
+                ShopTrait shopTrait = npc.getOrAddTrait(ShopTrait.class);
+                // now we can look at the shops and see if this is the one we want. Note that this only
+                // works if the shop is the default one.
+                ShopTrait.NPCShop shop = shopTrait.getDefaultShop();
+                if (shop == e.getShop()) {
+                    // this is the shop we want.
+                    Plugin.log("Shop purchase event for " + npc.getFullName() + " from player " + e.getPlayer().getDisplayName());
+                    // we can now handle the purchase.
+                    GeminiNPCTrait t = Plugin.getTraitFor(npc);
+                    if (t != null) {
+                        // we have a shop, so we can handle the purchase.
+                        List<String> items = new ArrayList<>();
+                        for (NPCShopAction res : e.getItem().getResult()) {
+                            // collect the bought items into a list of strings, we'll collate these into
+                            // a single string of the form "item1 xN, item2 xM, ...".
+                            if(res instanceof ItemAction itemAction){
+                                for(ItemStack item: itemAction.items) {
+                                    items.add(item.getType().name() + " x" + item.getAmount());
+                                }
+                            }
+                        }
+                        // and finally we will tell the player (but only if there are items).
+                        if(!items.isEmpty()) {
+                            // no items bought, so we can just say "nothing".
+                            String itemList = String.join(", ", items);
+                            Plugin.log("Items bought: " + items);
+                            t.onShopPurchase(e.getPlayer(), itemList);
+                        } else {
+                            Plugin.log("No items bought!");
+                        }
+                    }
+                    break; // no need to check any more NPCs.
+                }
+            }
+        }
+
     }
 }
