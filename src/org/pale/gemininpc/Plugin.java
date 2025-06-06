@@ -47,6 +47,11 @@ public class Plugin extends JavaPlugin implements Listener {
     boolean showSystemInstructions; // config option
     int attackNotificationDuration; // config option - how many seconds does the "you have been attacked by.." last
     boolean callsEnabled = true;    // use to disable calls to Gemini LLM model
+
+    // how long we wait after a purchase before saying "no more purchases incoming, let's group
+    // them and process them."
+    long purchaseTimeout = 3000; // milliseconds
+
     private final Registry commandRegistry = new Registry(ROOTCMDNAME);
     static final int TICK_RATE = 20;
     public String defaultGender = "non-binary";
@@ -230,6 +235,7 @@ public class Plugin extends JavaPlugin implements Listener {
         defaultGender = ps.getString("default-gender","non-binary");
         showSystemInstructions = ps.getBoolean("show-system-instructions", false);
         attackNotificationDuration = ps.getInt("attack-notification-duration", 20);
+        purchaseTimeout = ps.getLong("purchase-timeout", 3000L); // default 3 seconds
 
         // load the common templates - these can contain template variables themselves {{like}} {{this}}, and
         // can be included in all persona templates with {{include "common_template_name"}}.

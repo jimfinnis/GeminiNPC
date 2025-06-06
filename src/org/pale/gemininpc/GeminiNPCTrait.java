@@ -16,7 +16,6 @@ import net.citizensnpcs.trait.ShopTrait;
 import org.bukkit.*;
 import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
-import org.bukkit.entity.Item;
 import org.bukkit.entity.Monster;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.Inventory;
@@ -107,7 +106,6 @@ public class GeminiNPCTrait extends Trait {
     // distances for greeting players
     static final double GREET_DIST = 8;
     static final double GREET_DISTY = 2;
-
 
     static final int MAXTICKINT = 10;   // how many ticks it takes before an update
 
@@ -275,6 +273,8 @@ public class GeminiNPCTrait extends Trait {
     /**
      * This is called when a player right-clicks on an NPC. The held item is transferred into the NPCs
      * inventory, and the respondTo function is called with a special message.
+     *
+     * Note that this WILL NOT be called if the NPC has a shop.
      */
     void give(Player p) {
         ItemStack playerStack = p.getInventory().getItemInMainHand();
@@ -309,11 +309,53 @@ public class GeminiNPCTrait extends Trait {
         respondTo(p, "(gives you " + st.getType().name() + ")");
     }
 
+    // this timer controls responses to purchases. When a purchase happens, it is set to a few seconds in the
+    // future. This is set each time the purchase happens. When it expires, that means a purchase hasn't
+    // happened for a little while and we can now respond to all the purchases.
+
+    long purchaseTimer = 0;
+    Map<Player, Map<String, Integer>> itemsBoughtByPlayer = new HashMap<>(); // player -> item type -> amount
+
+    private void checkPurchaseTimer(){
+        if(purchaseTimer>0 && System.currentTimeMillis() > purchaseTimer){
+            // we have a purchase timer that has expired, so we can now send the purchases to the AI.
+            for(Map.Entry<Player, Map<String, Integer>> entry : itemsBoughtByPlayer.entrySet()){
+                Player p = entry.getKey();
+                Map<String, Integer> itemsBought = entry.getValue();
+                List<String> items = new ArrayList<>();
+                for(Map.Entry<String, Integer> itemEntry : itemsBought.entrySet()){
+                    String itemType = itemEntry.getKey();
+                    int amount = itemEntry.getValue();
+                    items.add(amount + "x " + itemType);
+                }
+                String itemsString = String.join(", ", items);
+                // send the response to the AI
+                respondTo(p, "(" + p.getDisplayName() + " bought " + itemsString + " from you)");
+            }
+            itemsBoughtByPlayer.clear(); // clear the map
+            purchaseTimer = 0; // stop the timer
+        }
+    }
+
     /**
-     * Respond to a player buying an item from an NPC with a shop
+     * Respond to a player buying items from an NPC with a shop. We just add the items
+     * to the itemsBought map; later we will send a message to the AI once a timer has
+     * expired so that we don't send a lot of individual requests.
+     *
      */
-    void onShopPurchase(Player p, String itemList){
-        respondTo(p, "(purchases " + itemList + ")");
+    void onShopPurchase(Player p, List<ItemStack> itemList){
+        // get or create the map for this player
+        Map<String, Integer> itemsBought = itemsBoughtByPlayer.computeIfAbsent(p, k -> new HashMap<>());
+        // for each stack, add the item type and amount to that map.
+        for(ItemStack s: itemList){
+            if(itemsBought.containsKey(s.getType().name())){
+                itemsBought.put(s.getType().name(), itemsBought.get(s.getType().name()) + s.getAmount());
+            } else {
+                itemsBought.put(s.getType().name(), s.getAmount());
+            }
+        }
+        // reset the timer to n milliseconds in the future
+        purchaseTimer = System.currentTimeMillis() + Plugin.getInstance().purchaseTimeout;
     }
 
     /**
@@ -425,6 +467,7 @@ public class GeminiNPCTrait extends Trait {
      * and if there are any, we send them to the players in range.
      */
     private void update() {
+        checkPurchaseTimer();   // check if we have a purchase timer that has expired, and if so, send the purchases to the AI.
         // check the queue - if there are any messages, speak them.
         while (!queue.isEmpty()) {
             String s = queue.poll();

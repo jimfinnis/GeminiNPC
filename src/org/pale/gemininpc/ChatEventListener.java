@@ -152,6 +152,7 @@ public final class ChatEventListener implements Listener {
         }
     }
 
+
     @EventHandler
     public static void shopPurchase(ShopTrait.NPCShopPurchaseEvent e) {
         // getting the NPC out of the event is tricky. We're only interested in our NPCs, so we can
@@ -169,22 +170,18 @@ public final class ChatEventListener implements Listener {
                     GeminiNPCTrait t = Plugin.getTraitFor(npc);
                     if (t != null) {
                         // we have a shop, so we can handle the purchase.
-                        List<String> items = new ArrayList<>();
+                        List<ItemStack> items = new ArrayList<>();
                         for (NPCShopAction res : e.getItem().getResult()) {
                             // collect the bought items into a list of strings, we'll collate these into
                             // a single string of the form "item1 xN, item2 xM, ...".
                             if(res instanceof ItemAction itemAction){
-                                for(ItemStack item: itemAction.items) {
-                                    items.add(item.getType().name() + " x" + item.getAmount());
-                                }
+                                items.addAll(itemAction.items);
                             }
                         }
                         // and finally we will tell the player (but only if there are items).
                         if(!items.isEmpty()) {
                             // no items bought, so we can just say "nothing".
-                            String itemList = String.join(", ", items);
-                            Plugin.log("Items bought: " + items);
-                            t.onShopPurchase(e.getPlayer(), itemList);
+                            t.onShopPurchase(e.getPlayer(), items);
                         } else {
                             Plugin.log("No items bought!");
                         }
