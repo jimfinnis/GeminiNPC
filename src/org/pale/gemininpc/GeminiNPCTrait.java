@@ -13,6 +13,8 @@ import net.citizensnpcs.api.trait.TraitName;
 import net.citizensnpcs.api.util.DataKey;
 
 import net.citizensnpcs.trait.ShopTrait;
+import net.citizensnpcs.trait.shop.ItemAction;
+import net.citizensnpcs.trait.shop.NPCShopAction;
 import org.bukkit.*;
 import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
@@ -564,6 +566,10 @@ public class GeminiNPCTrait extends Trait {
         boolean nonNPCPresent = false;
         Location myLocation = npc.getStoredLocation();
 
+        // if we can't get the entity, we can't do anything. Perhaps because it just despawned?? That's
+        // when I'm getting this error - just after NPC death events.
+        if(npc.getEntity()==null)return;
+
         for (Entity e : npc.getEntity().getNearbyEntities(d, dy, d)) {
             if (e instanceof Player p) {
                 if (!CitizensAPI.getNPCRegistry().isNPC(e))
@@ -868,6 +874,9 @@ public class GeminiNPCTrait extends Trait {
             if(npc.hasTrait(SentinelTrait.class)){
                 parts.add(getPartFromText("sentinel-instruction"));
             }
+            if(isShop()){
+                addShopInstructions(parts);
+            }
 
             if(waypoints.getNumberOfWaypoints()>0){
                 var locs = String.join(",", waypoints.getWaypointNames());
@@ -900,6 +909,32 @@ public class GeminiNPCTrait extends Trait {
             chat = plugin.client.chats.create(plugin.model, config);
             log_debug("NPC " + npc.getFullName() + " has been created with model " + plugin.model);
             log_debug("org.pale.gemininpc.Persona: " + personaString);
+        }
+    }
+
+    static private String getItemStringFromShopActions(List<NPCShopAction> acts){
+        var x = acts.stream().map(a -> a.describe()).toList();
+        return String.join(", ", x);
+    }
+
+    private void addShopInstructions(List<Part> parts) {
+        parts.add(getPartFromText("shop-instruction"));
+        // add the shop items
+        var shop = npc.getOrAddTrait(ShopTrait.class).getDefaultShop();
+        String title = shop.getName();
+        // we can only get the first page because for some reason there's no way of getting
+        // the number of pages, and the code uses a getOrAdd.. pattern.
+        var page = shop.getOrCreatePage(0);
+
+        // vile, vile, vile. There's no way of getting the item count.
+        for(int i=0;;i++){
+            var item = page.getItem(i);
+            if(item==null) break; // no more items.
+            var result = getItemStringFromShopActions(item.getResult());
+            var cost = getItemStringFromShopActions(item.getCost());
+            String itemString = String.format("you sell %s for %s", result, cost);
+            Plugin.log("Adding item to shop instructions: " + itemString);
+            parts.add(Part.fromText(itemString));
         }
     }
 

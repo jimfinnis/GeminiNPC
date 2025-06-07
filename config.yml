@@ -16,6 +16,8 @@ texts:
     sentinel-instruction: |
         You can send the 'setguard playername' command, which will make you follow and guard a player.
         You can also send the 'unguard' command, which will stop you following and guarding a player.
+    shop-instruction: |
+        You are a shopkeeper. Users can right-click you to open your shop.
     location-list-start: "Locations you can go to: "
 
     no-skylight-time: You are underground and do not know the time.
