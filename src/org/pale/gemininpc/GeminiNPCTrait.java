@@ -275,7 +275,6 @@ public class GeminiNPCTrait extends Trait {
     /**
      * This is called when a player right-clicks on an NPC. The held item is transferred into the NPCs
      * inventory, and the respondTo function is called with a special message.
-     *
      * Note that this WILL NOT be called if the NPC has a shop.
      */
     void give(Player p) {
@@ -913,7 +912,7 @@ public class GeminiNPCTrait extends Trait {
     }
 
     static private String getItemStringFromShopActions(List<NPCShopAction> acts){
-        var x = acts.stream().map(a -> a.describe()).toList();
+        var x = acts.stream().map(NPCShopAction::describe).toList();
         return String.join(", ", x);
     }
 
@@ -943,7 +942,7 @@ public class GeminiNPCTrait extends Trait {
             var result = item.getResult();
             var cost = item.getCost();
 
-            var resultMat = getItemMaterialFromShopActions(result);
+            // var resultMat = getItemMaterialFromShopActions(result);
             var costMat = getItemMaterialFromShopActions(cost);
             var displayMat = item.getDisplayItem(null).getType(); // this is the item that is displayed in the shop, not the result or cost.
 
@@ -967,12 +966,12 @@ public class GeminiNPCTrait extends Trait {
         parts.add(getPartFromText("shop-instruction"));
         // add the shop items
         var shop = npc.getOrAddTrait(ShopTrait.class).getDefaultShop();
-        String title = shop.getName();
         // we can only get the first page because for some reason there's no way of getting
         // the number of pages, and the code uses a getOrAdd.. pattern.
 
-        var page = shop.getOrCreatePage(0);
-        addInstructionsForShopPage(page, parts);
+        for(var page: shop.getPages()) {
+            addInstructionsForShopPage(page, parts);
+        }
     }
 
 
