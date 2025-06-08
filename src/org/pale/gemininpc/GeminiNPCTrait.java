@@ -917,6 +917,52 @@ public class GeminiNPCTrait extends Trait {
         return String.join(", ", x);
     }
 
+    private Material getItemMaterialFromShopActions(List<NPCShopAction> acts){
+        // work out the material which is the result of an action. We only take ItemActions into
+        // account, and we stop at the first one.
+        if(acts.isEmpty()) return null;
+        for(NPCShopAction act : acts){
+            if(act instanceof ItemAction ia){
+                // we have an item action, so return the material. We're going to ignore
+                // any stack after the first.
+                if(!ia.items.isEmpty()){
+                    ItemStack item = ia.items.getFirst();
+                    if(item!=null)return item.getType();
+                }
+            }
+        }
+        return null; // no item action found
+    }
+
+    private void addInstructionsForShopPage(ShopTrait.NPCShopPage page, List<Part> parts) {
+        // add the shop instructions
+        // vile, vile, vile. There's no way of getting the item count.
+        for(int i=0;i<45;i++){ // max items in a 5x9 shop. It's annoying, this.
+            var item = page.getItem(i);
+            if(item==null) continue; // item is null, skip it.
+            var result = item.getResult();
+            var cost = item.getCost();
+
+            var resultMat = getItemMaterialFromShopActions(result);
+            var costMat = getItemMaterialFromShopActions(cost);
+            var displayMat = item.getDisplayItem(null).getType(); // this is the item that is displayed in the shop, not the result or cost.
+
+            String itemString;
+            if(costMat == displayMat){
+                // if the item displayed in the shop is the COST item, we are buying this kind of thing.
+                itemString = String.format("you buy %s for %s", getItemStringFromShopActions(cost),
+                        getItemStringFromShopActions(result));
+            } else {
+                // otherwise, we are selling this kind of thing.
+                itemString = String.format("you sell %s for %s", getItemStringFromShopActions(result),
+                        getItemStringFromShopActions(cost));
+
+            }
+            Plugin.log("Adding item to shop instructions: " + itemString);
+            parts.add(Part.fromText(itemString));
+        }
+    }
+
     private void addShopInstructions(List<Part> parts) {
         parts.add(getPartFromText("shop-instruction"));
         // add the shop items
@@ -924,18 +970,9 @@ public class GeminiNPCTrait extends Trait {
         String title = shop.getName();
         // we can only get the first page because for some reason there's no way of getting
         // the number of pages, and the code uses a getOrAdd.. pattern.
-        var page = shop.getOrCreatePage(0);
 
-        // vile, vile, vile. There's no way of getting the item count.
-        for(int i=0;;i++){
-            var item = page.getItem(i);
-            if(item==null) break; // no more items.
-            var result = getItemStringFromShopActions(item.getResult());
-            var cost = getItemStringFromShopActions(item.getCost());
-            String itemString = String.format("you sell %s for %s", result, cost);
-            Plugin.log("Adding item to shop instructions: " + itemString);
-            parts.add(Part.fromText(itemString));
-        }
+        var page = shop.getOrCreatePage(0);
+        addInstructionsForShopPage(page, parts);
     }
 
 

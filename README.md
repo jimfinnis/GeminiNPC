@@ -14,7 +14,7 @@ to guard particular players and follow them.
 
 ## Not yet documented
 
-* interaction with the shop trait, including the "sold" command
+* interaction with the shop trait
 * the response/command system, which allows the NPC to respond to specific commands - and what those commands are
 
 
@@ -66,7 +66,9 @@ string: |
 
 default-gender: non-binary
 
-# This is a list of template values that can be used in the persona string.
+# This is a list of template values that can be used in the persona string. These don't have to be strings, they
+# can be lists or other YAML structures. They can be used in the persona string with the templating system;
+# there is an example below of this.
 
 template-values:
     key: value
@@ -142,6 +144,10 @@ Here's an example of a YAML persona file that uses the templating engine. It use
 choose an item from a list of personality traits. Note the two sublists in the `random_personality_features` list,
 used for mutually exclusive traits. The `pick` function will choose one of the sublists and then choose one of the items
 within that sublist.
+
+Note that the `template-values` here could also be in the main `config.yml` file, which would make them available
+to all NPCs, but this is just an example of how to use the templating system in a persona file.
+
 ```
 string: |
         {{include "intro"}}
