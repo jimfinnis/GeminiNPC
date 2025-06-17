@@ -240,6 +240,13 @@ The following commands are available for waypoints:
 * `/gemini wpdesc <name> <description>` - changes the description of the waypoint with the given name.
 * `/gemini wploc <name>` - shows the location of the waypoint with the given name to the player's current location.
 
+## Responding to other NPCs
+It can be confusing - and can cause you to run out of LLM usage - if NPCs are free to respond to each other.
+Each NPC has a probability of responding to other NPCs. This is set in the config file to a default value of 0.1,
+which means that there is a 10% chance that an NPC will respond to another NPC's message.
+
+This can be changed to each NPC with the '/gemini setnrp <probability>' command, where the probability is a
+number between 0 and 1. The command stands for "set NPC response probability".
 
 ## Other random notes
 These are a bit disorganised! 

@@ -52,6 +52,10 @@ public class Plugin extends JavaPlugin implements Listener {
     // them and process them."
     long purchaseTimeout = 3000; // milliseconds
 
+    // the default probability that one of our NPCs will respond to something said by another NPC,
+    // as opposed to a player
+    double defaultNPCRespondProb = 0;
+
     private final Registry commandRegistry = new Registry(ROOTCMDNAME);
     static final int TICK_RATE = 20;
     public String defaultGender = "non-binary";
@@ -236,6 +240,8 @@ public class Plugin extends JavaPlugin implements Listener {
         showSystemInstructions = ps.getBoolean("show-system-instructions", false);
         attackNotificationDuration = ps.getInt("attack-notification-duration", 20);
         purchaseTimeout = ps.getLong("purchase-timeout", 3000L); // default 3 seconds
+
+        defaultNPCRespondProb = ps.getDouble("default-npc-respond-prob", 0.1);
 
         // load the common templates - these can contain template variables themselves {{like}} {{this}}, and
         // can be included in all persona templates with {{include "common_template_name"}}.
@@ -622,6 +628,24 @@ public class Plugin extends JavaPlugin implements Listener {
         String gender = c.getArgs()[0];
         c.msg(ChatColor.AQUA+"Setting gender to "+gender);
         c.getCitizen().setGender(gender);
+    }
+
+    @SuppressWarnings("unused")
+    @Cmd(desc="set the chance (0-1) that this NPC will respond to another NPC's message", cz=true, argc=1)
+    public void setnrp(CallInfo c) {
+        String arg = c.getArgs()[0];
+        try {
+            double prob = Double.parseDouble(arg);
+            if(prob<0 || prob>1){
+                c.msg(ChatColor.RED+"Probability must be between 0 and 1");
+                return;
+            }
+            GeminiNPCTrait t = c.getCitizen();
+            t.npcRespondProb = prob;
+            c.msg(ChatColor.AQUA+"Set NPC respond probability to "+prob);
+        } catch (NumberFormatException e) {
+            c.msg(ChatColor.RED+"Invalid probability: "+arg);
+        }
     }
 
     @SuppressWarnings("unused")

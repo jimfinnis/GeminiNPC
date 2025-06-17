@@ -6,6 +6,7 @@ main:
     common: "plugins/GeminiNPC/common"
     show-system-instructions: false
     attack-notification-duration: 20
+    default-npc-respond-prob: 0.1
 
 
 persona-directories:

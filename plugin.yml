@@ -3,6 +3,7 @@ main: org.pale.gemininpc.Plugin
 version: 0.0.0
 api-version: 1.18
 depend: [Citizens]
+
 commands:
   gemini:
     description: Gemini NPC config command

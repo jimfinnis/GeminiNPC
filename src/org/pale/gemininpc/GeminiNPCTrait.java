@@ -83,6 +83,8 @@ public class GeminiNPCTrait extends Trait {
     Location navTarget;     // current path destination using our waypoints (not Chatcitizen's) or null
     boolean debug;
 
+    double npcRespondProb = 0; // probability that we will respond to something an NPC says (as opposed to a player)
+
     // So, tell me who hurt you? And when?
 
     Entity whoDamagedBy;
@@ -194,6 +196,8 @@ public class GeminiNPCTrait extends Trait {
         // (i.e. a value is not provided in the NPC) we will use the persona to set it, which in turn
         // may get it from the plugin's config.
         gender = key.getString("gender", null);
+        // load the NPC respond probability
+        npcRespondProb = key.getDouble("npc_respond_prob", Plugin.getInstance().defaultNPCRespondProb);
         waypoints.load(key);
     }
 
@@ -201,6 +205,8 @@ public class GeminiNPCTrait extends Trait {
     public void save(DataKey key) {
         key.setString("pname", personaName);
         key.setString("gender",gender);
+        key.setDouble("npc_respond_prob", npcRespondProb);
+
         waypoints.save(key);
     }
 
@@ -986,6 +992,12 @@ public class GeminiNPCTrait extends Trait {
      * @param utterance  The message they sent.
      */
     public void respondTo(Player player, String utterance) {
+
+        if(player!=null && player.hasMetadata("NPC")) {
+            // here we are responding to an NPC. We only allow this under certain circumstances.
+            return;
+        }
+
         // if the chat session is null, we need to create it.
         createChatIfNull();
 
@@ -1074,6 +1086,7 @@ public class GeminiNPCTrait extends Trait {
     void showInfo(CallInfo c) {
         c.msg("NPC " + getNPC().getName());
         c.msg("  org.pale.gemininpc.Persona: " + personaName + "gender: "+gender);
+        c.msg("  NPC respond probability: "+npcRespondProb);
         c.msg("  Waypoints:");
         for (String name : waypoints.getWaypointNames()) {
             try {
