@@ -994,8 +994,9 @@ public class GeminiNPCTrait extends Trait {
     public void respondTo(Player player, String utterance) {
 
         if(player!=null && player.hasMetadata("NPC")) {
-            // here we are responding to an NPC. We only allow this under certain circumstances.
-            return;
+            // here we are responding to an NPC. We only allow this sometimes, according to npcRespondProb
+            if(ThreadLocalRandom.current().nextDouble()>npcRespondProb)
+                return;
         }
 
         // if the chat session is null, we need to create it.

@@ -245,8 +245,8 @@ It can be confusing - and can cause you to run out of LLM usage - if NPCs are fr
 Each NPC has a probability of responding to other NPCs. This is set in the config file to a default value of 0.1,
 which means that there is a 10% chance that an NPC will respond to another NPC's message.
 
-This can be changed to each NPC with the '/gemini setnrp <probability>' command, where the probability is a
-number between 0 and 1. The command stands for "set NPC response probability".
+This can be changed to each NPC with the '/gemini setrespond <probability>' command, where the probability is a
+number between 0 and 1.
 
 ## Other random notes
 These are a bit disorganised! 

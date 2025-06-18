@@ -632,7 +632,7 @@ public class Plugin extends JavaPlugin implements Listener {
 
     @SuppressWarnings("unused")
     @Cmd(desc="set the chance (0-1) that this NPC will respond to another NPC's message", cz=true, argc=1)
-    public void setnrp(CallInfo c) {
+    public void setrespond(CallInfo c) {
         String arg = c.getArgs()[0];
         try {
             double prob = Double.parseDouble(arg);
