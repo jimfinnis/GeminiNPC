@@ -35,6 +35,8 @@ import com.google.genai.types.Content;
 import org.mcmonkey.sentinel.SentinelTrait;
 import org.pale.gemininpc.command.CallInfo;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
+import org.pale.gemininpc.utils.ItemManipulation;
+import org.pale.gemininpc.utils.TextUtils;
 import org.pale.gemininpc.utils.TransientNotification;
 import org.pale.gemininpc.utils.TransientNotificationMap;
 import org.pale.gemininpc.waypoints.Waypoint;
@@ -378,19 +380,7 @@ public class GeminiNPCTrait extends Trait {
             String mname = command.substring(5).toUpperCase().trim().replaceAll(" ", "_");
             Material mat = Material.getMaterial(mname);
             if (mat != null) {
-                ItemStack st = new ItemStack(mat, 1);
-                HashMap<Integer, ItemStack> map = p.getInventory().addItem(st);
-                if (map.isEmpty()) {
-                    // we added the item to the player
-                    p.sendMessage(ChatColor.AQUA + npc.getFullName() + " gives you " + st.getType().name());
-                    // if the npc has one, remove it
-                    if (npc.getEntity() instanceof Player npcp) {
-                        Inventory inv = npcp.getInventory();
-                        inv.removeItem(st);
-                    }
-                } else {
-                    p.sendMessage(ChatColor.RED + npc.getFullName() + " tried to give you " + st.getType().name() + " but your inventory is full.");
-                }
+                ItemManipulation.giveItemToPlayerOrDrop(npc, p, new ItemStack(mat, 1));
             } else {
                 log_debug("Bad material name in command: " + command);
             }
@@ -433,6 +423,23 @@ public class GeminiNPCTrait extends Trait {
                     Plugin.log("Cannot find waypoint: " + name);
                 }
             }
+        } else if(command.startsWith("writebook")){
+            String bookdata = command.substring(10).trim();
+            // split into title and text by vertical bar
+            String[] parts = bookdata.split("\\|", 2);
+            if(parts.length < 2){
+                parts = new String[2];
+                parts[0] = "Untitled";
+                parts[1] = bookdata;
+            }
+            String title = parts[0].trim();
+            String text = parts[1].trim();
+            ItemStack book = TextUtils.writeBook(title, npc.getFullName(), text);
+            // give the book to the player if there is one. Drop it on the ground if there isn't,
+            // or if the player had no inventory room.
+            Plugin.log("Book written");
+            ItemManipulation.giveItemToPlayerOrDrop(npc,p, book);
+
         }
 
     }
