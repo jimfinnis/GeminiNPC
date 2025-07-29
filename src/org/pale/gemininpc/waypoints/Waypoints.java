@@ -123,10 +123,12 @@ public class Waypoints {
         Waypoint near = null;
         for(String s: waypoints.keySet()) {
             Waypoint w = waypoints.get(s);
-            double d = loc.distanceSquared(w.loc);
-            if (d < min && d < thresholdSquared) {
-                min = d;
-                near = w;
+            if(w.loc.getWorld() == loc.getWorld()) { // only consider waypoints in the same world
+                double d = loc.distanceSquared(w.loc);
+                if (d < min && d < thresholdSquared) {
+                    min = d;
+                    near = w;
+                }
             }
         }
         if(near!=null){

@@ -89,6 +89,7 @@ public class Plugin extends JavaPlugin implements Listener {
             throw new RuntimeException("oi! only one instance!");
     }
 
+
     @Override
     public void onEnable() {
         instance = this;
@@ -387,6 +388,10 @@ public class Plugin extends JavaPlugin implements Listener {
 
 
     public static boolean isNear(Location a, Location b, double dist, double ydist) {
+        if(a.getWorld() != b.getWorld()){
+            // different worlds, can't be near
+            return false;
+        }
         return (a.distance(b) < dist && Math.abs(a.getY() - b.getY()) < ydist);
     }
 

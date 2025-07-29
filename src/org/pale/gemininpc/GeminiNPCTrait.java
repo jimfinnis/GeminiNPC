@@ -18,6 +18,7 @@ import net.citizensnpcs.trait.shop.NPCShopAction;
 import org.bukkit.*;
 import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
+import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Monster;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.Inventory;
@@ -164,17 +165,21 @@ public class GeminiNPCTrait extends Trait {
             // if navTarget is null, this is an navigation target set via a pathTo call. We will
             // call a completion handler if one is available. We also teleport if we didn't get
             // there!
-            double dist = npc.getStoredLocation().distance(navTarget);
-            if (debug) log_debug("Navigator completed with code: " + navCompletionCode.label + ", dist: " + dist);
-            if (navCompletionHandler != null) {
-                navCompletionHandler.call(navCompletionCode, dist);
-                navCompletionHandler = null;
-            }
-            if (dist > 2.0) {
-                // emergency teleport. If we didn't get there, or the system claims we got there but we're still
-                // a fair distance away, TP to it. Hate this.
-                Plugin.log("Navigator did not arrive at destination, teleporting to " + navTarget);
-                npc.teleport(navTarget.add(0, 1, 0), PlayerTeleportEvent.TeleportCause.PLUGIN);
+            if(npc.getStoredLocation().getWorld() == navTarget.getWorld()) {
+                // we are in the same world, so we can check the distance - we shouldn't get the
+                // case where nav to a place in a different world completes!
+                double dist = npc.getStoredLocation().distance(navTarget);
+                if (debug) log_debug("Navigator completed with code: " + navCompletionCode.label + ", dist: " + dist);
+                if (navCompletionHandler != null) {
+                    navCompletionHandler.call(navCompletionCode, dist);
+                    navCompletionHandler = null;
+                }
+                if (dist > 2.0) {
+                    // emergency teleport. If we didn't get there, or the system claims we got there but we're still
+                    // a fair distance away, TP to it. Hate this.
+                    Plugin.log("Navigator did not arrive at destination, teleporting to " + navTarget);
+                    npc.teleport(navTarget.add(0, 1, 0), PlayerTeleportEvent.TeleportCause.PLUGIN);
+                }
             }
             navTarget = null;
         }
@@ -582,11 +587,17 @@ public class GeminiNPCTrait extends Trait {
         // when I'm getting this error - just after NPC death events.
         if(npc.getEntity()==null)return;
 
+        // also, it needs to be a LivingEntity so we can run hasLineOfSight on it.
+        if(!(npc.getEntity() instanceof LivingEntity))
+            return;
+
+        LivingEntity npcEntity = (LivingEntity) npc.getEntity();
+
         for (Entity e : npc.getEntity().getNearbyEntities(d, dy, d)) {
             if (e instanceof Player p) {
                 if (!CitizensAPI.getNPCRegistry().isNPC(e))
                     nonNPCPresent = true;
-                if (p.hasLineOfSight(npc.getEntity())) {
+                if (npcEntity.hasLineOfSight(e)) {
                     double dx = myLocation.getX() - p.getLocation().getX();
                     double dz = myLocation.getZ() - p.getLocation().getZ();
                     double dist = Math.sqrt(dx * dx + dz * dz);
@@ -598,13 +609,14 @@ public class GeminiNPCTrait extends Trait {
                 }
             } else if(e instanceof Monster m){
                 String mname = m.getName();
+                // should be same world because getNearbyEntities only returns entities in the same world
                 double dist = m.getLocation().distance(npc.getEntity().getLocation());
                 MonsterData nm = nearestMonster.get();
                 if (nm == null || dist < nm.dist) {
                     nearestMonster.set(new MonsterData(mname, dist));
                     if(debug)log_debug(String.format("%s detected monster %s (dist %.2f)",
                             npc.getEntity().getName(), mname, dist));
-                    if(m.hasLineOfSight(npc.getEntity())){
+                    if(npcEntity.hasLineOfSight(m)){
                         MonsterData nvm = nearestVisibleMonster.get();
                         if (nvm == null || dist < nvm.dist) {
                             nearestVisibleMonster.set(new MonsterData(mname, dist));
@@ -830,6 +842,8 @@ public class GeminiNPCTrait extends Trait {
             root.addProperty("light from the sun", "none");
             root.addProperty("light from lamps", "none");
         }
+
+        root.addProperty("world", w.getName());
 
         // now, add the combat data - extra data will also be added if this is a Sentinel
         appendCombatData(root);
