@@ -1,0 +1,3 @@
+string: |
+    {{include "common"}}
+    {{pick(random_personality_features,3,"\n")}}

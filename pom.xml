@@ -8,8 +8,8 @@
   <packaging>jar</packaging>
   <version>0.0.1</version>
   <properties>
-    <maven.compiler.source>17</maven.compiler.source>
-    <maven.compiler.target>17</maven.compiler.target>
+    <maven.compiler.source>21</maven.compiler.source>
+    <maven.compiler.target>21</maven.compiler.target>
     
     <!-- change these bits. Originally we actually linked against plugins in the live server dir.
     Hence the name here. -->
@@ -129,7 +129,6 @@
                   <exclude>org.spigotmc:*</exclude>
                   <exclude>org.bukkit:*</exclude>
                   <exclude>org.mcmonkey:*</exclude>
-                  <exclude>net.livecar.nuttyworks:*</exclude>
                     <exclude>org.pale:jcfutils</exclude>
 
                   <exclude>classworlds:classworlds</exclude>
