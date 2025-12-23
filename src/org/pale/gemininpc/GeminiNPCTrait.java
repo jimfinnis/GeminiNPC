@@ -1,11 +1,13 @@
 package org.pale.gemininpc;
 
+import java.io.StringReader;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 import com.google.gson.*;
+import com.google.gson.stream.JsonReader;
 import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.ai.Navigator;
 import net.citizensnpcs.api.trait.Trait;
@@ -33,7 +35,9 @@ import com.google.genai.types.GenerateContentConfig;
 import com.google.genai.types.GenerateContentResponse;
 import com.google.genai.types.Part;
 import com.google.genai.types.Content;
+
 import org.mcmonkey.sentinel.SentinelTrait;
+
 import org.pale.gemininpc.command.CallInfo;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
 import org.pale.gemininpc.utils.ItemManipulation;
@@ -42,6 +46,7 @@ import org.pale.gemininpc.utils.TransientNotification;
 import org.pale.gemininpc.utils.TransientNotificationMap;
 import org.pale.gemininpc.waypoints.Waypoint;
 import org.pale.gemininpc.waypoints.Waypoints;
+
 import org.pale.jcfutils.region.Region;
 import org.pale.jcfutils.region.RegionManager;
 
@@ -61,6 +66,7 @@ public class GeminiNPCTrait extends Trait {
         super("gemininpc");
         plugin = JavaPlugin.getPlugin(Plugin.class);
     }
+
 
     void log_debug(String s){
         if(debug)Plugin.log(npc.getName()+ ": "+s);
@@ -502,7 +508,9 @@ public class GeminiNPCTrait extends Trait {
             Plugin.log(npc.getName() +" returned JSON string is: " + s);
             JsonElement json;
             try {
-                json = JsonParser.parseString(s);
+                JsonReader reader = new JsonReader(new StringReader(s));
+                reader.setStrictness(Strictness.LENIENT);
+                json = JsonParser.parseReader(reader);
             } catch (Exception e) {
                 plugin.getLogger().severe("Error parsing JSON: " + e.getMessage());
                 return;
@@ -1059,6 +1067,9 @@ public class GeminiNPCTrait extends Trait {
                     return;
                 }
                 String msg = response.text(); // will block?
+                if(msg == null){
+                    plugin.getServer().getLogger().severe("response text is null!");
+                }
                 // put that in the queue
                 // otherwise we're all good. Queue the message.
                 queue.offer(msg);
