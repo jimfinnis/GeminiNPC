@@ -6,7 +6,7 @@
   <groupId>org.pale</groupId>
   <artifactId>gemininpc</artifactId>
   <packaging>jar</packaging>
-  <version>0.0.1</version>
+  <version>0.0.2</version>
   <properties>
     <maven.compiler.source>21</maven.compiler.source>
     <maven.compiler.target>21</maven.compiler.target>
@@ -56,12 +56,29 @@
       <scope>system</scope>
       <systemPath>${server.plugindir}/Sentinel-2.9.2-SNAPSHOT-b527.jar</systemPath>
     </dependency>
+
+        <!-- remove this when you've finished the port to langchain -->
     <dependency>
     <groupId>com.google.genai</groupId>
     <artifactId>google-genai</artifactId>
     <version>0.4.0</version>
   </dependency>
-    <dependency>
+
+      <dependency>
+          <groupId>dev.langchain4j</groupId>
+          <artifactId>langchain4j</artifactId>
+          <version>1.9.1</version>
+      </dependency>
+
+
+      <dependency>
+          <groupId>dev.langchain4j</groupId>
+          <artifactId>langchain4j-google-ai-gemini</artifactId>
+          <version>1.9.1</version>
+      </dependency>
+
+
+      <dependency>
       <groupId>io.marioslab.basis</groupId>
       <artifactId>template</artifactId>
       <version>1.7</version>

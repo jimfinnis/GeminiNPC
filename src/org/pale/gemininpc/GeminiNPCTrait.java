@@ -30,14 +30,10 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 
 
-import com.google.genai.Chat;
-import com.google.genai.types.GenerateContentConfig;
-import com.google.genai.types.GenerateContentResponse;
-import com.google.genai.types.Part;
-import com.google.genai.types.Content;
-
 import org.mcmonkey.sentinel.SentinelTrait;
 
+import org.pale.gemininpc.ai.Chat;
+import org.pale.gemininpc.ai.SystemInstructions;
 import org.pale.gemininpc.command.CallInfo;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
 import org.pale.gemininpc.utils.ItemManipulation;
@@ -75,6 +71,9 @@ public class GeminiNPCTrait extends Trait {
     public boolean isShop() {
         return npc.hasTrait(ShopTrait.class);
     }
+    public boolean isSentinel() {
+        return npc.hasTrait(SentinelTrait.class);
+    }
 
     enum NavCompletionCode {
         ARRIVED("arrived"),
@@ -86,7 +85,7 @@ public class GeminiNPCTrait extends Trait {
         }
     }
 
-    final Plugin plugin;           // useful pointer back to the plugin shared by all traits
+    public final Plugin plugin;           // useful pointer back to the plugin shared by all traits
     private int tickint = 0;        // a counter to slow down updates
     public long timeSpawned = 0;    // ticks since spawn
     Location navTarget;     // current path destination using our waypoints (not Chatcitizen's) or null
@@ -134,19 +133,20 @@ public class GeminiNPCTrait extends Trait {
     // is returned it is added to this queue. We don't need to store the player, because the
     // NPC will just "say" the response to all players in range. The queue is read inside the
     // update method by polling - not ideal, but it's very quick and the update infrequent.
-    final ConcurrentLinkedQueue<String> queue = new ConcurrentLinkedQueue<>();
+    final ConcurrentLinkedQueue<Chat.Response> queue = new ConcurrentLinkedQueue<>();
 
     // this is the Chat API object - it's created the first time you call the respondTo method,
     // or when it's called after you change the persona (which sets this to zero)
     Chat chat = null; // will be created the first time you chat
+
     // this is the system instruction that will be sent. It's the "default" personality. Yes, it
     // can be creepy as heck.
     static final String DEFAULT_PERSONA = "You have no memory of who or what you are.";
 
     String personaName = "default"; // the name of the persona
-    String gender = null;
+    public String gender = null;
 
-    final Waypoints waypoints = new Waypoints();
+    public final Waypoints waypoints = new Waypoints();
 
     /**
      * This gets called very infrequently, randomly. And never more than the per-NPC
@@ -385,7 +385,6 @@ public class GeminiNPCTrait extends Trait {
      * @param command the command
      */
     private void performCommand(Player p, String command) {
-        boolean hasSentinel = npc.hasTrait(SentinelTrait.class);
         Sentinel s = Plugin.getInstance().sentinelPlugin;
         if (command.startsWith("give ")) {
             String mname = command.substring(5).toUpperCase().trim().replaceAll(" ", "_");
@@ -397,7 +396,7 @@ public class GeminiNPCTrait extends Trait {
             }
         }
         else if(command.startsWith("setguard")){
-            if(hasSentinel){
+            if(isSentinel()){
                 String name = command.substring(9).trim();
                 if(name.equalsIgnoreCase("none")){
                     s.setGuard(npc, null);
@@ -415,7 +414,7 @@ public class GeminiNPCTrait extends Trait {
                 Plugin.log("NPC " + npc.getFullName() + " does not have Sentinel.");
             }
         } else if(command.startsWith("unguard")){
-            if(hasSentinel){
+            if(isSentinel()){
                 s.setGuard(npc, null);
                 Plugin.log("NPC " + npc.getFullName() + " unguarded.");
             } else {
@@ -458,8 +457,9 @@ public class GeminiNPCTrait extends Trait {
     /**
      * Handle a JSON response object, which contains response, command and player elements.
      */
-    private void processResponse(JsonElement json){
+    private void processResponse(Chat.Response r){
         // get the response, command and player
+        /* Legacy JSON parsing
         JsonObject o = json.getAsJsonObject();
         JsonElement tmp;
         tmp = o.get("response");
@@ -469,6 +469,10 @@ public class GeminiNPCTrait extends Trait {
         tmp = o.get("player");
         String playerName = (tmp == null || tmp.isJsonNull()) ? null : tmp.getAsString();
         Plugin.log("responding to : " + playerName);
+         */
+        String response = r.response;
+        String playerName = r.player;
+        String command = r.command;
         if (response != null) {
             for (NearbyPlayer p : nearbyPlayers) {
                 // Plugin.log("message in queue : " + s);
@@ -482,7 +486,7 @@ public class GeminiNPCTrait extends Trait {
         } else {
             Plugin.log("null msg");
         }
-        if (command != null) {
+        if (command != null && !command.isBlank()) {
             performCommand(playerName==null?null:plugin.getServer().getPlayer(playerName), command);
         }
     }
@@ -495,17 +499,14 @@ public class GeminiNPCTrait extends Trait {
         checkPurchaseTimer();   // check if we have a purchase timer that has expired, and if so, send the purchases to the AI.
         // check the queue - if there are any messages, speak them.
         while (!queue.isEmpty()) {
-            String s = queue.poll();
+            Chat.Response r = queue.poll();
             // parse the response
-            // remove any backtick wrapping around the response.
-            if (s.startsWith("```")) {
-                s = s.substring(3, s.length() - 3);
-            }
-            // if the string starts with "json" remove it.
-            if (s.startsWith("json")) {
-                s = s.substring(4);
-            }
-            Plugin.log(npc.getName() +" returned JSON string is: " + s);
+            Plugin.log(npc.getName() +" returned JSON string is: " + r.toString());
+            processResponse(r);
+            /*
+
+            --------- Legacy JSON parser -------------
+
             JsonElement json;
             try {
                 JsonReader reader = new JsonReader(new StringReader(s));
@@ -523,6 +524,7 @@ public class GeminiNPCTrait extends Trait {
             } else {
                 processResponse(json);
             }
+            */
         }
 
         updateNearbyEntities(NEARBY_ENTITIES_SCAN_DIST, NEARBY_ENTITIES_SCAN_DISTY);
@@ -539,11 +541,10 @@ public class GeminiNPCTrait extends Trait {
     /**
      * Get the persona string from the plugin, applying templates as necessary. Only done
      * when a chat is created! It's probably expensive.
-     * @param pname persona name
      * @return the processed persona string
      */
-    private String getPersonaString(String pname) {
-        Persona persona = Plugin.getInstance().personae.get(pname);
+    public String getPersonaString() {
+        Persona persona = Plugin.getInstance().personae.get(personaName);
         String s;
         if (persona == null) {
             // if we don't have a persona, use the default.
@@ -884,11 +885,6 @@ public class GeminiNPCTrait extends Trait {
         return isSnow;
     }
 
-    // no sniggering at the back there. This gets a part from a text defined in the config.
-    private Part getPartFromText(String textName){
-        return Part.fromText(plugin.getText(textName));
-    }
-
     /**
      * If the chat - the link to the upstream LLM - is null, create a new one setting
      * up the config and the system instructions. This is done when we respond to
@@ -896,53 +892,28 @@ public class GeminiNPCTrait extends Trait {
      */
     private void createChatIfNull(){
         if (chat == null) {
-            String personaString = getPersonaString(personaName);
-            // generate the system instruction from the persona string.
+            SystemInstructions si = new SystemInstructions(this);
 
-            Content.Builder b = Content.builder();
-            b.role("user");
-            List<Part> parts = new ArrayList<>();
-            parts.add(Part.fromText("Your name is " + npc.getFullName() + ". "));
-            parts.add(getPartFromText("standard-system-instructions"));
-            parts.add(Part.fromText(personaString));
-            if(npc.hasTrait(SentinelTrait.class)){
-                parts.add(getPartFromText("sentinel-instruction"));
-            }
-            if(isShop()){
-                addShopInstructions(parts);
+            if(isShop())
+                si.add("shop-instructions", getShopInstructions());
+
+            if(isSentinel()){
+                si.addCommand("setguard PLAYER","set a player to start guarding");
+                si.addCommand("unguard", "stop guarding a player");
             }
 
-            if(waypoints.getNumberOfWaypoints()>0){
-                var locs = String.join(",", waypoints.getWaypointNames());
-                parts.add(getPartFromText("go-instruction"));
-                parts.add(Part.fromText(plugin.getText("location-list-start") + locs));
-                for(String name : waypoints.getWaypointNames()) {
-                    try {
-                        var desc = waypoints.getWaypoint(name).desc;
-                        parts.add(Part.fromText("\"" + name + "\": " + desc));
-                    } catch (Waypoints.Exception e) {
-                        plugin.getLogger().severe("Error getting waypoint description: " + e.getMessage());
-                    }
-                }
-            }
+            String systemInstruction  = si.toString();
 
-            b.parts(parts);
-
-            Content systemInstruction = b.build();
             if(plugin.showSystemInstructions)
-                Plugin.log("System instruction for "+npc.getName()+" is "+ systemInstruction.toJson());
+                Plugin.log("System instruction for "+npc.getName()+" is "+ systemInstruction);
 
-            // add this to the config.
-            GenerateContentConfig config = GenerateContentConfig.builder()
-                    .maxOutputTokens(256)   // we want quite short, conversational responses
+            // create new chat.
+            chat = Chat.builder()
+                    .maxMessages(30)
                     .systemInstruction(systemInstruction)
-                    .responseMimeType("application/json")
-                    .build();
-            // create new chat with the model specified in the plugin (which comes from
-            // the configuration file).
-            chat = plugin.client.chats.create(plugin.model, config);
+                    .build(plugin.model);
+
             log_debug("NPC " + npc.getFullName() + " has been created with model " + plugin.model);
-            log_debug("org.pale.gemininpc.Persona: " + personaString);
         }
     }
 
@@ -968,9 +939,10 @@ public class GeminiNPCTrait extends Trait {
         return null; // no item action found
     }
 
-    private void addInstructionsForShopPage(ShopTrait.NPCShopPage page, List<Part> parts) {
-        // add the shop instructions
+    private void getPricesForShopPage(ShopTrait.NPCShopPage page, JsonArray buyList, JsonArray sellList) {
+        // adds to 2 JSON arrays - one for buying and one for selling.
         // vile, vile, vile. There's no way of getting the item count.
+
         for(int i=0;i<45;i++){ // max items in a 5x9 shop. It's annoying, this.
             var item = page.getItem(i);
             if(item==null) continue; // item is null, skip it.
@@ -981,32 +953,38 @@ public class GeminiNPCTrait extends Trait {
             var costMat = getItemMaterialFromShopActions(cost);
             var displayMat = item.getDisplayItem(null).getType(); // this is the item that is displayed in the shop, not the result or cost.
 
-            String itemString;
+            JsonObject obj = new JsonObject();
             if(costMat == displayMat){
                 // if the item displayed in the shop is the COST item, we are buying this kind of thing.
-                itemString = String.format("you buy %s for %s", getItemStringFromShopActions(cost),
-                        getItemStringFromShopActions(result));
+                obj.addProperty("item", getItemStringFromShopActions(cost));
+                obj.addProperty("value", getItemStringFromShopActions(result));
+                buyList.add(obj);
             } else {
                 // otherwise, we are selling this kind of thing.
-                itemString = String.format("you sell %s for %s", getItemStringFromShopActions(result),
-                        getItemStringFromShopActions(cost));
-
+                obj.addProperty("item", getItemStringFromShopActions(result));
+                obj.addProperty("value", getItemStringFromShopActions(cost));
+                sellList.add(obj);
             }
-            Plugin.log("Adding item to shop instructions: " + itemString);
-            parts.add(Part.fromText(itemString));
         }
     }
 
-    private void addShopInstructions(List<Part> parts) {
-        parts.add(getPartFromText("shop-instruction"));
+    public JsonObject getShopInstructions() {
+        JsonObject obj = new JsonObject();
+        obj.addProperty("information", plugin.getText("shop-instruction"));
         // add the shop items
         var shop = npc.getOrAddTrait(ShopTrait.class).getDefaultShop();
         // we can only get the first page because for some reason there's no way of getting
         // the number of pages, and the code uses a getOrAdd.. pattern.
 
+        JsonArray buyList = new JsonArray();
+        JsonArray sellList = new JsonArray();
+
         for(var page: shop.getPages()) {
-            addInstructionsForShopPage(page, parts);
+            getPricesForShopPage(page, buyList, sellList);
         }
+        obj.add("items-you-buy", buyList);
+        obj.add("items-you-sell", sellList);
+        return obj;
     }
 
 
@@ -1061,18 +1039,15 @@ public class GeminiNPCTrait extends Trait {
                 String outString = output.toString();
                 plugin.getServer().getLogger().info("Sending to AI: " + outString);
                 plugin.request_count++;
-                GenerateContentResponse response = chat.sendMessage(outString); // send to AI
+                // here we get the response
+                Chat.Response response = chat.sendAndGetResponse(outString);
                 if (response == null) {
                     plugin.getServer().getLogger().severe("No response");
                     return;
                 }
-                String msg = response.text(); // will block?
-                if(msg == null){
-                    plugin.getServer().getLogger().severe("response text is null!");
-                }
                 // put that in the queue
                 // otherwise we're all good. Queue the message.
-                queue.offer(msg);
+                queue.offer(response);
             }).start();
         }
     }

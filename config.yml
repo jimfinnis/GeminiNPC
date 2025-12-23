@@ -13,10 +13,6 @@ persona-directories:
     - plugins/GeminiNPC/personae
 
 texts:
-    go-instruction: To go to a location, use the 'go locationname' command.
-    sentinel-instruction: |
-        You can send the 'setguard playername' command, which will make you follow and guard a player.
-        You can also send the 'unguard' command, which will stop you following and guarding a player.
     shop-instruction: |
         You are a shopkeeper. Users can right-click you to open your shop.
     location-list-start: "Locations you can go to: "
@@ -25,30 +21,28 @@ texts:
     no-skylight-weather: You are underground and do not know the weather.
     in-combat-now: You are currently in a fight!
 
+    # these are standard JSON instructions sent to the parser
     standard-system-instructions: |
-        Each input will be in this form:
-        
-        context: {
-            environment: string describing your environment (time, weather, etc)
-            inventory: list of items you have
+      {
+        "role": "system",
+        "rules": [
+          "Return ONLY valid JSON that matches the schema.",
+          "No comments.",
+          "No additional fields.",
+          "No trailing commas.",
+          "No explanation before or after the JSON."
+        ],
+        "response_schema": {
+          "player": "string",
+          "response": "string",
+          "command": "string"
+        },
+        "response_field_descriptions": {
+          "player": "The name of the player to whom you are responding, or empty if this is a response to an event.",
+          "response": "The chat response. Actions here should be in the form (he/she smiles quietly).",
+          "command": "A command to be performed."
+        },
+        "commands_and_descriptions": {
+          "give ITEM": "Give an item to a player. ITEM must be a Minecraft material"
         }
-        input: {
-            player name: the input string from the player to which you should respond
-        OR
-            event: an event that occurred
-        }
-        
-        The environment and inventory may be missing, in which case they are unchanged.
-        
-        Use this JSON schema for the output:
-        
-        Output = {'player': str, 'response': str, 'command': str}
-        
-        'player' is the name of the player to whom you are responding. It may be empty if you
-        are responding to an event.
-        
-        The command is optional and should be used rarely. The "give ITEM" command will give an item
-        to the player you are responding to. ITEM must be a Minecraft material.
-        
-        Within the reponse string, actions should be in third person and in brackets, like this: (He smiles quietly). Use this
-        rarely. Always write from your point of view.
+      }

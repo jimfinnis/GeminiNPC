@@ -1,7 +1,6 @@
 
 package org.pale.gemininpc;
 
-import com.google.genai.Client;
 import net.citizensnpcs.api.CitizensAPI;
 
 import java.io.IOException;
@@ -27,6 +26,7 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 
 import org.jetbrains.annotations.NotNull;
+import org.pale.gemininpc.ai.Model;
 import org.pale.gemininpc.command.*;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
 import org.pale.gemininpc.waypoints.Waypoint;
@@ -39,14 +39,14 @@ public class Plugin extends JavaPlugin implements Listener {
      */
     static Plugin instance = null;
     static final String ROOTCMDNAME = "gemini";
-    public String model; // the model to use for Gemini AI - visible for the trait
-    public Client client; // the client for the AI API - visible for the trait
     final EventRateTracker eventRateTracker = new EventRateTracker();
     int sched;  // scheduler handle
     int request_count = 0;   // AI request ctr
     boolean showSystemInstructions; // config option
     int attackNotificationDuration; // config option - how many seconds does the "you have been attacked by.." last
     boolean callsEnabled = true;    // use to disable calls to Gemini LLM model
+
+    public Model model; // the LLM interface
 
     // how long we wait after a purchase before saying "no more purchases incoming, let's group
     // them and process them."
@@ -128,13 +128,13 @@ public class Plugin extends JavaPlugin implements Listener {
             throw new RuntimeException("No main section in config");
         // get the api key and model for Gemini AI from the config
         String apiKey = deflt.getString("apikey", "NOKEY");
-        model = deflt.getString("model", "gemini-2.0-flash-lite");
+        String modelName = deflt.getString("model", "gemini-2.0-flash-lite");
+
+        // create the LLM interface
+        model = new Model(modelName, apiKey);
 
         // loads all the config data, including personae
         loadConfig(c);
-
-        // create the gen AI API client
-        client = Client.builder().apiKey(apiKey).build();
 
         // this is the listener for pretty much ALL events EXCEPT NPC events, not just chat.
         new ChatEventListener(this);
@@ -651,6 +651,14 @@ public class Plugin extends JavaPlugin implements Listener {
         } catch (NumberFormatException e) {
             c.msg(ChatColor.RED+"Invalid probability: "+arg);
         }
+    }
+
+    @Cmd(desc="dump memory to console", cz=true,argc=0)
+    public void dumpmem(CallInfo c){
+        GeminiNPCTrait t = c.getCitizen();
+        t.chat.dumpMem();
+
+
     }
 
     @SuppressWarnings("unused")
