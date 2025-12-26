@@ -96,12 +96,12 @@ public class Plugin extends JavaPlugin implements Listener {
         if(deflt==null)
             throw new RuntimeException("No main section in config");
         // get the api key and model for Gemini AI from the config
-        String apiKey = deflt.getString("apikey", "NOKEY");
-        String modelName = deflt.getString("model", "gemini-2.0-flash-lite");
-        int maxOutput = deflt.getInt("max-output-tokens", 0);
-
         // create the LLM interface
-        model = new Model(modelName, apiKey, maxOutput);
+        final ConfigurationSection modelSection = c.getConfigurationSection("model");
+        if(modelSection==null){
+            throw new RuntimeException("Model section in config.yml is null");
+        }
+        model = new Model(modelSection);
 
         // loads all the config data, including personae
         loadConfig(c);
@@ -437,6 +437,13 @@ public class Plugin extends JavaPlugin implements Listener {
     /**
      * Commands
      */
+
+    @Cmd(desc = "get info on model", cz=false)
+    public void modelinfo(CallInfo c){
+        String info = model.toString();
+        Plugin.log(info);
+        c.msg(info);
+    }
 
     @SuppressWarnings("unused")
     @Cmd(desc = "set the persona for an NPC", argc = 1, cz = true)
