@@ -13,7 +13,7 @@ public class SystemInstructions {
     private JsonObject base;
 
     public SystemInstructions addCommand(String cmd, String desc){
-        JsonObject cmds = base.getAsJsonObject("commands_and_descriptions");
+        JsonObject cmds = base.getAsJsonObject("commands");
         cmds.addProperty(cmd, desc);
         return this;
     }
@@ -24,9 +24,7 @@ public class SystemInstructions {
 
     public SystemInstructions(GeminiNPCTrait t){
         base = JsonParser.parseString(t.plugin.getText("standard-system-instructions")).getAsJsonObject();
-        base.addProperty("name", t.getNPC().getFullName());
-        base.addProperty("gender",t.gender);
-        base.addProperty("persona", t.getPersonaString());
+
         if(t.waypoints.getNumberOfWaypoints()>0) {
             addCommand("go WAYPOINT", "go to a given waypoint");
             JsonObject waypoints = new JsonObject();
@@ -40,6 +38,24 @@ public class SystemInstructions {
                 }
             }
         }
+
+        if(t.isShop())
+            add("shop-instructions", t.getShopInstructions());
+
+        if(t.isSentinel()){
+            addCommand("guard steve","start guarding the player Steve");
+            addCommand("unguard", "stop guarding a player");
+        }
+
+
+
+        base.addProperty("name", t.getNPC().getFullName());
+        base.addProperty("gender",t.gender);
+
+        // folding gender/name data into persona in the hope it gets noticed. But putting the persona
+        // at the end.
+        String persona = "You are "+t.getNPC().getFullName()+", and are "+t.gender+". "+t.getPersonaString();
+        base.addProperty("persona", persona);
     }
 
     public String toString(){

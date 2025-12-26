@@ -395,9 +395,9 @@ public class GeminiNPCTrait extends Trait {
                 log_debug("Bad material name in command: " + command);
             }
         }
-        else if(command.startsWith("setguard")){
+        else if(command.startsWith("guard")){
             if(isSentinel()){
-                String name = command.substring(9).trim();
+                String name = command.substring(6).trim();
                 if(name.equalsIgnoreCase("none")){
                     s.setGuard(npc, null);
                     Plugin.log("NPC " + npc.getFullName() + " unguarded.");
@@ -458,18 +458,6 @@ public class GeminiNPCTrait extends Trait {
      * Handle a JSON response object, which contains response, command and player elements.
      */
     private void processResponse(Chat.Response r){
-        // get the response, command and player
-        /* Legacy JSON parsing
-        JsonObject o = json.getAsJsonObject();
-        JsonElement tmp;
-        tmp = o.get("response");
-        String response = (tmp == null || tmp.isJsonNull()) ? null : tmp.getAsString();
-        tmp = o.get("command");
-        String command = (tmp == null || tmp.isJsonNull()) ? null : tmp.getAsString();
-        tmp = o.get("player");
-        String playerName = (tmp == null || tmp.isJsonNull()) ? null : tmp.getAsString();
-        Plugin.log("responding to : " + playerName);
-         */
         String response = r.response;
         String playerName = r.player;
         String command = r.command;
@@ -503,28 +491,6 @@ public class GeminiNPCTrait extends Trait {
             // parse the response
             Plugin.log(npc.getName() +" returned JSON string is: " + r.toString());
             processResponse(r);
-            /*
-
-            --------- Legacy JSON parser -------------
-
-            JsonElement json;
-            try {
-                JsonReader reader = new JsonReader(new StringReader(s));
-                reader.setStrictness(Strictness.LENIENT);
-                json = JsonParser.parseReader(reader);
-            } catch (Exception e) {
-                plugin.getLogger().severe("Error parsing JSON: " + e.getMessage());
-                return;
-            }
-
-            if(json.isJsonArray()){
-                for(JsonElement je : json.getAsJsonArray()){
-                    processResponse(je);
-                }
-            } else {
-                processResponse(json);
-            }
-            */
         }
 
         updateNearbyEntities(NEARBY_ENTITIES_SCAN_DIST, NEARBY_ENTITIES_SCAN_DISTY);
@@ -893,14 +859,6 @@ public class GeminiNPCTrait extends Trait {
     private void createChatIfNull(){
         if (chat == null) {
             SystemInstructions si = new SystemInstructions(this);
-
-            if(isShop())
-                si.add("shop-instructions", getShopInstructions());
-
-            if(isSentinel()){
-                si.addCommand("setguard PLAYER","set a player to start guarding");
-                si.addCommand("unguard", "stop guarding a player");
-            }
 
             String systemInstruction  = si.toString();
 

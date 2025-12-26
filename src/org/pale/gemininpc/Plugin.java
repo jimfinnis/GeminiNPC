@@ -89,6 +89,24 @@ public class Plugin extends JavaPlugin implements Listener {
             throw new RuntimeException("oi! only one instance!");
     }
 
+    private void loadConfigAndCreateModel(){
+        // load configuration data - this part of the config CAN'T be reloaded. Sorry.
+        FileConfiguration c = this.getConfig();
+        final ConfigurationSection deflt = c.getConfigurationSection("main");
+        if(deflt==null)
+            throw new RuntimeException("No main section in config");
+        // get the api key and model for Gemini AI from the config
+        String apiKey = deflt.getString("apikey", "NOKEY");
+        String modelName = deflt.getString("model", "gemini-2.0-flash-lite");
+        int maxOutput = deflt.getInt("max-output-tokens", 0);
+
+        // create the LLM interface
+        model = new Model(modelName, apiKey, maxOutput);
+
+        // loads all the config data, including personae
+        loadConfig(c);
+    }
+
 
     @Override
     public void onEnable() {
@@ -117,24 +135,10 @@ public class Plugin extends JavaPlugin implements Listener {
         // the project as config.yml)
         saveDefaultConfig();
 
-
         // register the commands automatically - these are tagged with @Cmd.
         commandRegistry.register(this); // register commands
 
-        // load configuration data - this part of the config CAN'T be reloaded. Sorry.
-        FileConfiguration c = this.getConfig();
-        final ConfigurationSection deflt = c.getConfigurationSection("main");
-        if(deflt==null)
-            throw new RuntimeException("No main section in config");
-        // get the api key and model for Gemini AI from the config
-        String apiKey = deflt.getString("apikey", "NOKEY");
-        String modelName = deflt.getString("model", "gemini-2.0-flash-lite");
-
-        // create the LLM interface
-        model = new Model(modelName, apiKey);
-
-        // loads all the config data, including personae
-        loadConfig(c);
+        loadConfigAndCreateModel();
 
         // this is the listener for pretty much ALL events EXCEPT NPC events, not just chat.
         new ChatEventListener(this);
@@ -254,6 +258,7 @@ public class Plugin extends JavaPlugin implements Listener {
                     if (template != null) {
                         // add the template to the template values
                         commonTemplates.put(name, template);
+                        log("Adding template from file: "+name);
                     }
                 });
         ConfigurationSection common_section = c.getConfigurationSection("common-templates");
@@ -262,6 +267,7 @@ public class Plugin extends JavaPlugin implements Listener {
                 String value = common_section.getString(key);
                 if (value != null) {
                     commonTemplates.put(key, value);
+                    log("Adding template from text: "+key);
                 }
             }
         }
@@ -463,7 +469,7 @@ public class Plugin extends JavaPlugin implements Listener {
     public void reload(CallInfo c) {
         reloadConfig();
         FileConfiguration cc = this.getConfig();
-        loadConfig(cc);
+        loadConfigAndCreateModel();
         for (String name : personae.keySet()) {
             c.msg("Loaded " + ChatColor.AQUA + " " + name);
         }

@@ -25,6 +25,8 @@ texts:
     standard-system-instructions: |
       {
         "role": "system",
+        "contract": "You must treat every field in this JSON object as a binding instruction. Do not ignore or skip any field.",
+
         "rules": [
           "Return ONLY valid JSON that matches the schema.",
           "No comments.",
