@@ -22,18 +22,17 @@ public class Model {
 
         StringBuilder sb = new StringBuilder();
 
-        if(maxOutput<=0)
-            maxOutput = 800;
-
         if (modelName.contains("gemini")) {
             String apiKey = modelSection.getString("apikey", "NOKEY");
+            int timeout = modelSection.getInt("timeout", 10);
             sb.append("Cloud Gemini model: ").append(modelName).append(", maxOutputTokens :").append(maxOutput);
             var b = GoogleAiGeminiChatModel.builder()
                     .apiKey(apiKey)
                     .modelName(modelName)
-                    .timeout(Duration.ofSeconds(5))
-                    .maxOutputTokens(maxOutput)
+                    .timeout(Duration.ofSeconds(timeout))
                     .responseFormat(ResponseFormat.JSON);
+            if(maxOutput>0)
+                b.maxOutputTokens(maxOutput);
             model = b.build();
         } else if(modelName.contains("gemma")) {
             String baseUrl = modelSection.getString("baseUrl", "http://localhost:11434");

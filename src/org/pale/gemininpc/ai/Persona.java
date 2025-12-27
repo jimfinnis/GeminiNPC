@@ -1,4 +1,4 @@
-package org.pale.gemininpc;
+package org.pale.gemininpc.ai;
 
 import io.marioslab.basis.template.Template;
 import io.marioslab.basis.template.TemplateContext;
@@ -6,7 +6,10 @@ import io.marioslab.basis.template.TemplateLoader;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.mcmonkey.sentinel.SentinelTrait;
+import org.pale.gemininpc.GeminiNPCTrait;
+import org.pale.gemininpc.Plugin;
 import org.pale.gemininpc.utils.TemplateFunctions;
+import org.pale.gemininpc.waypoints.Waypoints;
 
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -31,7 +34,7 @@ public class Persona {
      * can be included.
      * @param common a map containing common texts to be loaded into the template loader
      */
-    static void initialiseTemplateLoader(Map<String, String> common) {
+    public static void initialiseTemplateLoader(Map<String, String> common) {
         for(String key : common.keySet()) {
             String value = common.get(key);
             tl.set(key, value);
@@ -39,11 +42,11 @@ public class Persona {
     }
 
     /**
-     * Constructor for the org.pale.gemininpc.Persona class.
+     * Constructor for the org.pale.gemininpc.ai.Persona class.
      * @param name  the name of the file - this will become the name of the persona, with any .yml extension removed.
      * @param path  the path of the file
      */
-    Persona (String name, Path path) {
+    public Persona(String name, Path path) {
         // if the filename has a ".yml" extension, it's a yaml file otherwise it's plain text.
         var plugin = Plugin.getInstance();
         if (path.toString().endsWith(".yml")) {
@@ -86,7 +89,7 @@ public class Persona {
      * @param t the trait
      * @return the processed persona string
      */
-    public String generateString(GeminiNPCTrait t) {
+    public String generateSystemInstructions(GeminiNPCTrait t) {
         var plugin = Plugin.getInstance();
         // the doc advises creating a new context each time!
         TemplateContext tc = new TemplateContext();
@@ -115,11 +118,27 @@ public class Persona {
             Plugin.log("Template variable: "+s+" = "+tc.get(s));
         }
 
-        // now we can set the persona string as a template
-        tl.set("persona", string);
+        // set waypoints
+        if(t.waypoints.getNumberOfWaypoints()>0) {
+            Map<String, String> waymap = new HashMap<>();
+            for (String name : t.waypoints.getWaypointNames()) {
+                try {
+                    waymap.put(name, t.waypoints.getWaypoint(name).desc);
+                } catch (Waypoints.Exception e) {
+                    // really shouldn't happen; just ignore
+                }
+            }
+            tc.set("waypoints", waymap);
+        }
+        tc.set("hasWaypoints", t.waypoints.getNumberOfWaypoints()>0);
+
+
+        // now we can set the persona string as a template - but we ALWAYS include the common template.
+        tl.set("persona", "{{include \"common\"}}\n\n"+string);
         // load the persona template, including any common templates that have been set up.
-        Template template = tl.load("persona"); // ffs
+        Template template = tl.load("persona"); // ffs - clunky that we have to do the set/load like this
         String s= template.render(tc);
+        s = s.replaceAll("\\n\\n+", "\n"); // replace multiple newlines
         Plugin.log("Persona applied to " + t.getNPC().getName() + " is " + s);
         return s;
     }

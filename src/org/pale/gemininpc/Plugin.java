@@ -27,6 +27,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 
 import org.jetbrains.annotations.NotNull;
 import org.pale.gemininpc.ai.Model;
+import org.pale.gemininpc.ai.Persona;
 import org.pale.gemininpc.command.*;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
 import org.pale.gemininpc.waypoints.Waypoint;
@@ -176,7 +177,7 @@ public class Plugin extends JavaPlugin implements Listener {
      * replacement values - often strings but sometimes not (e.g. lists of strings are permitted).
      * They are applied to persona files when the persona is set on the NPC.
      */
-    final Map<String, Object> templateValues = new HashMap<>();
+    public final Map<String, Object> templateValues = new HashMap<>();
 
     /**
      * Used to read the contents of a file and warn if it fails, returning a string
@@ -454,7 +455,7 @@ public class Plugin extends JavaPlugin implements Listener {
             t.setPersona(persona);
         } else {
             Plugin.warn("No persona " + persona + " exists");
-            c.msg("org.pale.gemininpc.Persona " + ChatColor.RED + persona + ChatColor.YELLOW
+            c.msg("org.pale.gemininpc.ai.Persona " + ChatColor.RED + persona + ChatColor.YELLOW
                     + " does not exist");
         }
         c.msg("Set persona to " + ChatColor.AQUA + persona);
@@ -670,8 +671,12 @@ public class Plugin extends JavaPlugin implements Listener {
     public void dumpmem(CallInfo c){
         GeminiNPCTrait t = c.getCitizen();
         t.chat.dumpMem();
+    }
 
-
+    @Cmd(desc="show system prompt on console", cz=true, argc=0)
+    public void prompt(CallInfo c){
+        GeminiNPCTrait t = c.getCitizen();
+        t.plugin.getLogger().info(t.getSystemInstructions());
     }
 
     @SuppressWarnings("unused")
@@ -702,7 +707,7 @@ public class Plugin extends JavaPlugin implements Listener {
                         t.setPersona(persona);
                     } else {
                         Plugin.warn("No persona " + persona + " exists");
-                        c.msg("org.pale.gemininpc.Persona " + ChatColor.RED + persona + ChatColor.YELLOW
+                        c.msg("org.pale.gemininpc.ai.Persona " + ChatColor.RED + persona + ChatColor.YELLOW
                                 + " does not exist");
                     }
                 }

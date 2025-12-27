@@ -1,13 +1,11 @@
 package org.pale.gemininpc;
 
-import java.io.StringReader;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.stream.Collectors;
 
 import com.google.gson.*;
-import com.google.gson.stream.JsonReader;
 import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.ai.Navigator;
 import net.citizensnpcs.api.trait.Trait;
@@ -33,7 +31,7 @@ import org.bukkit.entity.Player;
 import org.mcmonkey.sentinel.SentinelTrait;
 
 import org.pale.gemininpc.ai.Chat;
-import org.pale.gemininpc.ai.SystemInstructions;
+import org.pale.gemininpc.ai.Persona;
 import org.pale.gemininpc.command.CallInfo;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
 import org.pale.gemininpc.utils.ItemManipulation;
@@ -395,9 +393,9 @@ public class GeminiNPCTrait extends Trait {
                 log_debug("Bad material name in command: " + command);
             }
         }
-        else if(command.startsWith("guard")){
+        else if(command.startsWith("setguard")){
             if(isSentinel()){
-                String name = command.substring(6).trim();
+                String name = command.substring(9).trim();
                 if(name.equalsIgnoreCase("none")){
                     s.setGuard(npc, null);
                     Plugin.log("NPC " + npc.getFullName() + " unguarded.");
@@ -476,6 +474,10 @@ public class GeminiNPCTrait extends Trait {
         }
         if (command != null && !command.isBlank()) {
             performCommand(playerName==null?null:plugin.getServer().getPlayer(playerName), command);
+            String msg = ChatColor.AQUA + "[" + npc.getFullName() + "] DOES: " + ChatColor.GOLD + command;
+            for (NearbyPlayer p : nearbyPlayers) {
+
+            }
         }
     }
 
@@ -505,11 +507,11 @@ public class GeminiNPCTrait extends Trait {
     }
 
     /**
-     * Get the persona string from the plugin, applying templates as necessary. Only done
-     * when a chat is created! It's probably expensive.
-     * @return the processed persona string
+     * Get the system instructions string from the plugin, via the appropriate Persona, applying templates as necessary.
+     * Only done when a chat is created!
+     * @return the system instructions from the persona
      */
-    public String getPersonaString() {
+    public String getSystemInstructions() {
         Persona persona = Plugin.getInstance().personae.get(personaName);
         String s;
         if (persona == null) {
@@ -520,7 +522,7 @@ public class GeminiNPCTrait extends Trait {
         } else {
             if(gender==null)    // no gender given yet
                 gender = persona.defaultGender; // we can get the gender from the persona
-            s = persona.generateString(this);
+            s = persona.generateSystemInstructions(this);
         }
         return s;
     }
@@ -858,10 +860,7 @@ public class GeminiNPCTrait extends Trait {
      */
     private void createChatIfNull(){
         if (chat == null) {
-            SystemInstructions si = new SystemInstructions(this);
-
-            String systemInstruction  = si.toString();
-
+            String systemInstruction = getSystemInstructions();
             if(plugin.showSystemInstructions)
                 Plugin.log("System instruction for "+npc.getName()+" is "+ systemInstruction);
 
@@ -1003,6 +1002,7 @@ public class GeminiNPCTrait extends Trait {
                     plugin.getServer().getLogger().severe("No response");
                     return;
                 }
+                plugin.getServer().getLogger().info("Response received");
                 // put that in the queue
                 // otherwise we're all good. Queue the message.
                 queue.offer(response);
@@ -1051,7 +1051,7 @@ public class GeminiNPCTrait extends Trait {
      */
     void showInfo(CallInfo c) {
         c.msg("NPC " + getNPC().getName());
-        c.msg("  org.pale.gemininpc.Persona: " + personaName + "gender: "+gender);
+        c.msg("  org.pale.gemininpc.ai.Persona: " + personaName + "gender: "+gender);
         c.msg("  NPC respond probability: "+npcRespondProb);
         c.msg("  Waypoints:");
         for (String name : waypoints.getWaypointNames()) {
