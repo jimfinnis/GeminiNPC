@@ -25,7 +25,7 @@ public class TestPrompt {
     private final ChatModel model;
     private final Chat chat;
 
-    private final String API_KEY = "AIzaSyDyvaoHMSUdE90aLkOGRc1dmchXFOl6sPA";
+    private final String API_KEY = "Your API here";
     private final String MODEL = "gemini-2.0-flash-lite";
     private static final String PROMPT_FILE = "x:\\plugins\\GeminiNPC\\testprompt";
     private static final String PROMPT_TEMPLATE_FIRST = """
