@@ -95,11 +95,16 @@ The following template functions are available:
 * `pick(list, n, delimiter)` - randomly choose `n` items from the list and join them with the delimiter. The same item
 cannot be chosen multiple times. Sublists are permitted - see below.
 * `random(lower, upper)` - randomly choose an integer between lower (inclusive) and upper (exclusive)
+* `mapset(mapname, key, value)` - set a value inside a map, creating the map if not found
+* `map(mapname)` - return the map given the name, creating the map if not found; the map can then have the standard Java map methods called and can be iterated in a for-loop (see the Basis docs)
+* `listadd(listname, value)` - add a value to a list, creating the list if not found
+* `list(listname)` - return a list as a Java List object
+* `drop(value)` - calculates the value but returns an empty string; occasionally useful because Basis will otherwise always render any returned value
 
 Remember that this code only runs once, so if you want to change the template values, you'll need to reload the NPCs
 with `/gemini reload` or restart the server.
 
-### Sublists
+### Sublists in pick and choose
 If an item chosen by `pick` or `choose` it itself a list, then an item will be chosen randomly from the nested list
 while (in the case of `pick`) the list itself will be removed from the list of items to choose from. This means that
 you can create mutually exclusive items by having a list of lists. See the next section for an example.

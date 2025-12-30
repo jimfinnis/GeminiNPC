@@ -1,19 +1,30 @@
 # configuration data
 
 main:
-    apikey: YOUR KEY HERE!
-    model: gemini-2.0-flash-lite
-    common: "plugins/GeminiNPC/common"
     show-system-instructions: false
     attack-notification-duration: 20
+    default-npc-respond-prob: 0.1
+    remove-newlines-from-persona: true
+
+model:
+    apikey: Your API HERE
+    model: gemini-2.0-flash-lite
+
+# Local Ollama model
+#    model: gemma3:27b
+#    baseUrl: http://somemachine.or.other:11434
+
 
 common-template-directories:
     - plugins/GeminiNPC/common-templates
     
+
+persona-directories:
+    - plugins/GeminiNPC/personae
+
 template-values:
     random_personality_features:
         - You really like tea.
-        - You tend to ramble in your speech.
         - 
             - You dislike daylight and prefer the dark.
             - You really hate night-time.
@@ -22,69 +33,23 @@ template-values:
             - You actually like monsters and wish peace was an option.
         -
             - You are plain-spoken.
-            - You tend to ramble in your speech.
             - You speak like a stereotypical English upper-class person.
             - You speak Estuary English.
             - You speak with a rural Welsh accent.
             - You speak with a rural West Country accent.
             - You speak with a Yorkshire accent.
-            - You speak in very educated way, with a fondness for Latin.
+            - You speak in an educated way, with a fondness for Latin.
         - You are a bit of a philosopher.
         - You don't like being outside, because of the dirt.
-        - You have a tendency to shout.
         - You are rather fed up with this place.
         - You are an agent of Chaos.
         - You love the bees.
         - You are a little too fond of bad puns.
         - You are a little too fond of swearing.
 
-persona-directories:
-    - plugins/GeminiNPC/personae
-    
 texts:
-    go-instruction: To go to a location, use the 'go locationname' command.
-    shop-instruction: |
-        You are a shopkeeper. Users can right-click you to open your shop.
-    sentinel-instruction: |
-        You can send the 'setguard playername' command, which will make you follow and guard a player.
-        You can also send the 'unguard' command, which will stop you following and guarding a player.
-
-    writer: |
-        To write a book, use the 'writebook title|text' command. The title should be a few
-        words. The text can be as long as you can manage.
-
     location-list-start: "Locations you can go to: "
-    
+
     no-skylight-time: You are underground and do not know the time.
     no-skylight-weather: You are underground and do not know the weather.
     in-combat-now: You are currently in a fight!
-    
-
-
-    standard-system-instructions: |
-        Each input will be in this form:
-    
-        context: {
-            environment: string describing your environment (time, weather, etc)
-            inventory: list of items you have
-        }
-        input: {
-            player name: the input string from the player to which you should respond
-        OR
-            event: an event that occurred
-        }
-    
-        The environment and inventory may be missing, in which case they are unchanged.
-        
-        Use this JSON schema for the output:
-        
-        Output = {'player': str, 'response': str, 'command': str}
-        
-        'player' is the name of the player to whom you are responding. It may be empty if you
-        are responding to an event.
-        
-        The command is optional and should be used rarely. The "give ITEM" command will give an item
-        to the player you are responding to. ITEM must be a Minecraft material.
-        
-        Within the reponse string, actions should be in third person and in brackets, like this: (He smiles quietly). Use this
-        rarely. Always write from your point of view.

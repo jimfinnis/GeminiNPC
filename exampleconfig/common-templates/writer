@@ -1,4 +1,5 @@
-To write a book, use the 'writebook title|text' command. The title should be a
+To write a book, use the "writebook title|text" action. The title should be a
 few words. The text can be as long as you can manage. Write in a more formal
-way than you speak, and do not include descriptions of what you are doing
-as you write.
+way than you speak. Make sure the text is appropriate for the text of a book.
+{{mapset("actions","writebook TITLE|TEXT","Write a book.")}}
+

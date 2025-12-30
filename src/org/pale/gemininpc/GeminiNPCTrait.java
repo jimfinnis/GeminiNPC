@@ -377,25 +377,25 @@ public class GeminiNPCTrait extends Trait {
     }
 
     /**
-     * There's a command in the reponse and we should run it.
+     * There's an action in the reponse and we should run it.
      *
      * @param p       the player in the reponse (i.e. who we are responding to)
-     * @param command the command
+     * @param action  the action
      */
-    private void performCommand(Player p, String command) {
+    private void performAction(Player p, String action) {
         Sentinel s = Plugin.getInstance().sentinelPlugin;
-        if (command.startsWith("give ")) {
-            String mname = command.substring(5).toUpperCase().trim().replaceAll(" ", "_");
+        if (action.startsWith("give ")) {
+            String mname = action.substring(5).toUpperCase().trim().replaceAll(" ", "_");
             Material mat = Material.getMaterial(mname);
             if (mat != null) {
                 ItemManipulation.giveItemToPlayerOrDrop(npc, p, new ItemStack(mat, 1));
             } else {
-                log_debug("Bad material name in command: " + command);
+                log_debug("Bad material name in action: " + action);
             }
         }
-        else if(command.startsWith("setguard")){
+        else if(action.startsWith("setguard")){
             if(isSentinel()){
-                String name = command.substring(9).trim();
+                String name = action.substring(9).trim();
                 if(name.equalsIgnoreCase("none")){
                     s.setGuard(npc, null);
                     Plugin.log("NPC " + npc.getFullName() + " unguarded.");
@@ -411,15 +411,15 @@ public class GeminiNPCTrait extends Trait {
             } else {
                 Plugin.log("NPC " + npc.getFullName() + " does not have Sentinel.");
             }
-        } else if(command.startsWith("unguard")){
+        } else if(action.startsWith("unguard")){
             if(isSentinel()){
                 s.setGuard(npc, null);
                 Plugin.log("NPC " + npc.getFullName() + " unguarded.");
             } else {
                 Plugin.log("NPC " + npc.getFullName() + " does not have Sentinel.");
             }
-        } else if(command.startsWith("go ")){
-            String name = command.substring(3).trim();
+        } else if(action.startsWith("go ")){
+            String name = action.substring(3).trim();
             if(name.equalsIgnoreCase("none")){
                 npc.getNavigator().cancelNavigation();
                 Plugin.log("NPC " + npc.getFullName() + " got a 'go none'.");
@@ -431,8 +431,8 @@ public class GeminiNPCTrait extends Trait {
                     Plugin.log("Cannot find waypoint: " + name);
                 }
             }
-        } else if(command.startsWith("writebook")){
-            String bookdata = command.substring(10).trim();
+        } else if(action.startsWith("writebook")){
+            String bookdata = action.substring(10).trim();
             // split into title and text by vertical bar
             String[] parts = bookdata.split("\\|", 2);
             if(parts.length < 2){
@@ -456,9 +456,9 @@ public class GeminiNPCTrait extends Trait {
      * Handle a JSON response object, which contains response, command and player elements.
      */
     private void processResponse(Chat.Response r){
-        String response = r.response;
+        String response = r.text;
         String playerName = r.player;
-        String command = r.command;
+        String action = r.action;
         if (response != null) {
             for (NearbyPlayer p : nearbyPlayers) {
                 // Plugin.log("message in queue : " + s);
@@ -472,9 +472,9 @@ public class GeminiNPCTrait extends Trait {
         } else {
             Plugin.log("null msg");
         }
-        if (command != null && !command.isBlank()) {
-            performCommand(playerName==null?null:plugin.getServer().getPlayer(playerName), command);
-            String msg = ChatColor.AQUA + "[" + npc.getFullName() + "] DOES: " + ChatColor.GOLD + command;
+        if (action != null && !action.isBlank()) {
+            performAction(playerName==null?null:plugin.getServer().getPlayer(playerName), action);
+            String msg = ChatColor.AQUA + "[" + npc.getFullName() + "] DOES: " + ChatColor.GOLD + action;
             for (NearbyPlayer p : nearbyPlayers) {
 
             }
@@ -868,7 +868,7 @@ public class GeminiNPCTrait extends Trait {
             chat = Chat.builder()
                     .maxMessages(30)
                     .systemInstruction(systemInstruction)
-                    .build(plugin.model);
+                    .build(plugin.model.model);
 
             log_debug("NPC " + npc.getFullName() + " has been created with model " + plugin.model);
         }

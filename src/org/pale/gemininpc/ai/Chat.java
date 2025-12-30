@@ -1,12 +1,9 @@
 package org.pale.gemininpc.ai;
 
-import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.message.SystemMessage;
-import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
-import dev.langchain4j.model.input.Prompt;
-import dev.langchain4j.model.output.structured.Description;
+import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.service.AiServices;
 import org.pale.gemininpc.Plugin;
 
@@ -19,7 +16,7 @@ public class Chat {
         private String systemInst = "";
         public ChatBuilder maxMessages(int i) { maxMessages = 30; return this;}
         public ChatBuilder systemInstruction(String s){ systemInst = s; return this; }
-        public Chat build(Model m){
+        public Chat build(ChatModel m){
             return new Chat(m, this);
         }
         private ChatBuilder(){} // avoid creating without "builder"
@@ -29,11 +26,11 @@ public class Chat {
 
     public static class Response {
         public String player;
-        public String response;
-        public String command;
+        public String text;
+        public String action;
 
         public String toString(){
-            return "Player:"+player+", Command:"+command+", Response:"+response;
+            return "Player:"+player+", Action:"+action+", Msg:"+text;
         }
     }
 
@@ -44,11 +41,11 @@ public class Chat {
     Responder responder;
     private MessageWindowChatMemory memory;
 
-    private Chat(Model model, ChatBuilder b) {
+    private Chat(ChatModel model, ChatBuilder b) {
         memory = MessageWindowChatMemory.withMaxMessages(b.maxMessages);
         responder = AiServices.builder(Responder.class)
                 .chatMemory(memory)
-                .chatModel(model.model)
+                .chatModel(model)
                 .build();
         memory.add(SystemMessage.from(b.systemInst));
     }

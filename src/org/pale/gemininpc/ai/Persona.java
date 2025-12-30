@@ -26,7 +26,7 @@ public class Persona {
 
     // this is the template loader that is used for all personae. We preload it with all the common stuff,
     // and then load the persona string into it as "persona" for each persona separately.
-    static TemplateLoader.MapTemplateLoader tl = new TemplateLoader.MapTemplateLoader();
+    static TemplateLoader.MapTemplateLoader tl;
 
     /**
      * This method is called once at the start of the plugin to set up the template loader.
@@ -35,6 +35,7 @@ public class Persona {
      * @param common a map containing common texts to be loaded into the template loader
      */
     public static void initialiseTemplateLoader(Map<String, String> common) {
+        tl = new TemplateLoader.MapTemplateLoader();
         for(String key : common.keySet()) {
             String value = common.get(key);
             tl.set(key, value);
@@ -111,7 +112,7 @@ public class Persona {
         // set some special values
         tc.set("name",t.getNPC().getName());
         tc.set("gender",t.gender);
-        tc.set("isSentinel",t.getNPC().hasTrait(SentinelTrait.class));
+        tc.set("isSentinel",t.isSentinel());
         tc.set("isShop", t.isShop());
 
         for(String s: tc.getVariables()){
@@ -132,14 +133,22 @@ public class Persona {
         }
         tc.set("hasWaypoints", t.waypoints.getNumberOfWaypoints()>0);
 
+        // get the actual persona string
+        // we want to run the template engine on this string, so load it via the template loader
+        // and render it
+        tl.set("temp", string);
+        Template pt = tl.load("temp");
+        string = pt.render(tc);
+        // now maybe replace newlines, because we need the persona to be JSONable (probably).
+        if(plugin.removeNewlinesFromPersona)
+            string = string.replaceAll("\\n"," ");
+        // then set it back into the template context as "persona"
+        tc.set("persona", string);
 
-        // now we can set the persona string as a template - but we ALWAYS include the common template.
-        tl.set("persona", "{{include \"common\"}}\n\n"+string);
-        // load the persona template, including any common templates that have been set up.
-        Template template = tl.load("persona"); // ffs - clunky that we have to do the set/load like this
+        // load and render the common template, which will include the persona
+        Template template = tl.load("common"); // ffs - clunky that we have to do the set/load like this
         String s= template.render(tc);
         s = s.replaceAll("\\n\\n+", "\n"); // replace multiple newlines
-        Plugin.log("Persona applied to " + t.getNPC().getName() + " is " + s);
         return s;
     }
 

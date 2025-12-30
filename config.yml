@@ -1,50 +1,55 @@
 # configuration data
 
 main:
-    apikey: your apikey here
-    model: gemini-2.0-flash-lite
-    common: "plugins/GeminiNPC/common"
     show-system-instructions: false
     attack-notification-duration: 20
     default-npc-respond-prob: 0.1
+    remove-newlines-from-persona: true
 
+model:
+    apikey: Your API HERE
+    model: gemini-2.0-flash-lite
+
+# Local Ollama model
+#    model: gemma3:27b
+#    baseUrl: http://somemachine.or.other:11434
+
+
+common-template-directories:
+    - plugins/GeminiNPC/common-templates
+    
 
 persona-directories:
     - plugins/GeminiNPC/personae
 
+template-values:
+    random_personality_features:
+        - You really like tea.
+        - 
+            - You dislike daylight and prefer the dark.
+            - You really hate night-time.
+        -
+            - You are scared of monsters.
+            - You actually like monsters and wish peace was an option.
+        -
+            - You are plain-spoken.
+            - You speak like a stereotypical English upper-class person.
+            - You speak Estuary English.
+            - You speak with a rural Welsh accent.
+            - You speak with a rural West Country accent.
+            - You speak with a Yorkshire accent.
+            - You speak in an educated way, with a fondness for Latin.
+        - You are a bit of a philosopher.
+        - You don't like being outside, because of the dirt.
+        - You are rather fed up with this place.
+        - You are an agent of Chaos.
+        - You love the bees.
+        - You are a little too fond of bad puns.
+        - You are a little too fond of swearing.
+
 texts:
-    shop-instruction: |
-        You are a shopkeeper. Users can right-click you to open your shop.
     location-list-start: "Locations you can go to: "
 
     no-skylight-time: You are underground and do not know the time.
     no-skylight-weather: You are underground and do not know the weather.
     in-combat-now: You are currently in a fight!
-
-    # these are standard JSON instructions sent to the parser
-    standard-system-instructions: |
-      {
-        "role": "system",
-        "contract": "You must treat every field in this JSON object as a binding instruction. Do not ignore or skip any field.",
-
-        "rules": [
-          "Return ONLY valid JSON that matches the schema.",
-          "No comments.",
-          "No additional fields.",
-          "No trailing commas.",
-          "No explanation before or after the JSON."
-        ],
-        "response_schema": {
-          "player": "string",
-          "response": "string",
-          "command": "string"
-        },
-        "response_field_descriptions": {
-          "player": "The name of the player to whom you are responding, or empty if this is a response to an event.",
-          "response": "The chat response. Actions here should be in the form (he/she smiles quietly).",
-          "command": "A command to be performed."
-        },
-        "commands_and_descriptions": {
-          "give ITEM": "Give an item to a player. ITEM must be a Minecraft material"
-        }
-      }

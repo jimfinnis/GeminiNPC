@@ -53,6 +53,9 @@ public class Plugin extends JavaPlugin implements Listener {
     // them and process them."
     long purchaseTimeout = 3000; // milliseconds
 
+    // true to remove newlines from the persona string (typically for JSON prompts)
+    public boolean removeNewlinesFromPersona = false;
+
     // the default probability that one of our NPCs will respond to something said by another NPC,
     // as opposed to a player
     double defaultNPCRespondProb = 0;
@@ -246,6 +249,8 @@ public class Plugin extends JavaPlugin implements Listener {
         showSystemInstructions = ps.getBoolean("show-system-instructions", false);
         attackNotificationDuration = ps.getInt("attack-notification-duration", 20);
         purchaseTimeout = ps.getLong("purchase-timeout", 3000L); // default 3 seconds
+
+        removeNewlinesFromPersona = ps.getBoolean("remove-newlines-from-persona", false);
 
         defaultNPCRespondProb = ps.getDouble("default-npc-respond-prob", 0.1);
 

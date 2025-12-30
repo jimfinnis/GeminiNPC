@@ -1,10 +1,9 @@
-package test.java;
 import io.marioslab.basis.template.Template;
 import io.marioslab.basis.template.TemplateContext;
 import io.marioslab.basis.template.TemplateLoader;
 import org.junit.jupiter.api.Test;
 
-import java.nio.file.Path;
+import java.util.ArrayList;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -74,5 +73,25 @@ public class TemplateTest {
         tc.set("greeting", "Hello, world!");
         rendered = t.render(tc);
         assertEquals("greeting 2: Hello, world!", rendered);
+    }
+
+    @Test
+    public void testList(){
+        TemplateLoader.MapTemplateLoader loader = new TemplateLoader.MapTemplateLoader();
+
+        // add a template to the loader
+
+
+        // it's really FUCKING ANNOYING that ArrayList.add returns a boolean; I have to drop it here
+        // in an ugly way.
+        loader.set("testTemplate", "{{list.add(\"wibble\")?\"\":\"\"}}greeting: {{greeting}}");
+        Template t = loader.load("testTemplate");
+        TemplateContext tc = new TemplateContext();
+        tc.set("list", new ArrayList<String>());
+        tc.set("greeting", "Hello, world!");
+        String rendered = t.render(tc);
+        assertEquals("greeting: Hello, world!", rendered);
+
+
     }
 }

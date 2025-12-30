@@ -1,11 +1,10 @@
 package org.pale.gemininpc.utils;
 
 import io.marioslab.basis.template.TemplateContext;
+import org.checkerframework.checker.units.qual.A;
 import org.pale.gemininpc.GeminiNPCTrait;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
 
 /**
  * Useful functions for templates wrapped in a class.
@@ -40,6 +39,26 @@ public class TemplateFunctions {
         int apply(int arg1, int arg2);
     }
 
+    @FunctionalInterface
+    public interface StringStringFunction {
+        String apply(String arg);
+    }
+
+    @FunctionalInterface
+    public interface StringStringToStringFunction {
+        String apply(String a1, String a2);
+    }
+
+    @FunctionalInterface
+    public interface StringStringStringToStringFunction {
+        String apply(String a1, String a2, String a3);
+    }
+
+    @FunctionalInterface
+    public interface StringObjectFunction {
+        Object apply(String arg);
+    }
+
     /**
      * Add functions to the template context. This is run every time the template is used!
      * @param tc the template context to add to
@@ -49,6 +68,11 @@ public class TemplateFunctions {
         tc.set("choose", stringChooseFunction);
         tc.set("pick", pickFunction);
         tc.set("random", randomFunction);
+        tc.set("drop", dropFunction);   // replaces any value with nothing; useful for list.add() etc.
+        tc.set("mapset", addToMapFunction);  // set an item in a map, creating a new map if needed. Args: mapname,k,v
+        tc.set("map", getMapFunction); // get a map by name
+        tc.set("listadd", addToListFunction); // append an item to a list, creating a new list if needed. Args: listname,v
+        tc.set("list", getListFunction); // get a list by name
     }
 
     private String chooseItem(Object item, boolean remove) {
@@ -105,4 +129,24 @@ public class TemplateFunctions {
      */
 
     public final IntIntToIntFunction randomFunction = (a, b) -> prng.nextInt(a, b);
+
+    public final StringStringFunction dropFunction = (a) -> "";
+
+    Map<String, Map<String,String>> maps = new HashMap<>();
+    Map<String, List<String>> lists = new HashMap<>();
+
+    public final StringStringStringToStringFunction addToMapFunction = (mapname, key, value) -> {
+        Map<String, String> map = maps.computeIfAbsent(mapname,k -> new HashMap<>());
+        map.put(key,value);
+        return "";
+    };
+    public final StringObjectFunction getMapFunction = mapname -> maps.computeIfAbsent(mapname,k -> new HashMap<>());
+
+    public final StringStringToStringFunction addToListFunction = (listname, value) -> {
+        List<String> lst = lists.computeIfAbsent(listname,k -> new ArrayList<>());
+        lst.add(value);
+        return "";
+    };
+
+    public final StringObjectFunction getListFunction = listname -> lists.computeIfAbsent(listname, k-> new ArrayList<>());
 }

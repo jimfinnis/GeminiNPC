@@ -13,7 +13,7 @@ import java.time.Duration;
  * Encapsulates the model we're using
  */
 public class Model {
-    ChatModel model;
+    public ChatModel model;
     String info;
 
     public Model(ConfigurationSection modelSection){
@@ -29,6 +29,7 @@ public class Model {
             var b = GoogleAiGeminiChatModel.builder()
                     .apiKey(apiKey)
                     .modelName(modelName)
+                    .logResponses(true)
                     .timeout(Duration.ofSeconds(timeout))
                     .responseFormat(ResponseFormat.JSON);
             if(maxOutput>0)
