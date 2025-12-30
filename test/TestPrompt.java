@@ -3,6 +3,8 @@ import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
 import org.pale.gemininpc.ai.Chat;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
 
@@ -25,7 +27,7 @@ public class TestPrompt {
     private final ChatModel model;
     private final Chat chat;
 
-    private final String API_KEY = "Your API here";
+    private final String CONFIG = "x:\\plugins\\GeminiNPC\\config.yml";
     private final String MODEL = "gemini-2.0-flash-lite";
     private static final String PROMPT_FILE = "x:\\plugins\\GeminiNPC\\testprompt";
     private static final String PROMPT_TEMPLATE_FIRST = """
@@ -39,8 +41,16 @@ public class TestPrompt {
             """;
 
     TestPrompt(){
+
+        String apiKey = "";
+        try {
+            apiKey = extractApiKey(CONFIG);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+
         var b = GoogleAiGeminiChatModel.builder()
-                .apiKey(API_KEY)
+                .apiKey(apiKey)
                 .modelName(MODEL)
                 .logResponses(true)
                 .timeout(Duration.ofSeconds(10))
@@ -59,6 +69,23 @@ public class TestPrompt {
                 .maxMessages(30)
                 .systemInstruction(systemInstruction)
                 .build(model);
+    }
+
+
+    // first we need to extract the key. I'm going to do it the dumb way to avoid deps; it's the only
+    // thing I need.
+
+    public static String extractApiKey(String path) throws IOException {
+        try (BufferedReader reader = new BufferedReader(new FileReader(path))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                line = line.trim();
+                if (line.startsWith("apikey:")) {
+                    return line.substring("apikey:".length()).trim();
+                }
+            }
+        }
+        throw new RuntimeException("Can't find key in config file "+path);
     }
 
     /**
