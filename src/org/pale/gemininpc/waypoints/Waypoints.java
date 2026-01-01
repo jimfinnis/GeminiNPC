@@ -24,7 +24,7 @@ public class Waypoints {
 
     public void add(String name, String world, String desc, int x, int y, int z) {
         Waypoint w = new Waypoint(world, name, desc, x, y, z);
-        waypoints.put(name, w);
+        waypoints.put(name.toLowerCase(), w);
     }
 
     public void add(String name, String desc, Location loc) {
@@ -87,7 +87,7 @@ public class Waypoints {
     }
 
     public Location pathTo(GeminiNPCTrait t, String name) throws Exception {
-        Waypoint w = waypoints.get(name);
+        Waypoint w = waypoints.get(name.toLowerCase());
         // wonder what this does in a different world???
         if(w==null)throw new Exception("No such waypoint " + name);
         Navigator navigator = t.getNPC().getNavigator();

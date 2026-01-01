@@ -114,11 +114,11 @@ public class Persona {
         tc.set("gender",t.gender);
         tc.set("isSentinel",t.isSentinel());
         tc.set("isShop", t.isShop());
-
+/*
         for(String s: tc.getVariables()){
             Plugin.log("Template variable: "+s+" = "+tc.get(s));
         }
-
+*/
         // set waypoints
         if(t.waypoints.getNumberOfWaypoints()>0) {
             Map<String, String> waymap = new HashMap<>();
