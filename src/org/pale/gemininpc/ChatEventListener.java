@@ -122,8 +122,6 @@ public final class ChatEventListener implements Listener {
 
     @EventHandler
     public void onEntityDeath(EntityDeathEvent event){
-        Plugin.log(ChatColor.RED+"Entity death event: " + event.getEntity().getName());
-        Plugin.log("Attacker: " + event.getEntity().getKiller());
         Entity e = event.getEntity();
         if(damageMap.containsKey(e)){
             // we know that one of our NPCs attacked. We can assume that it will be

@@ -3,19 +3,24 @@ package org.pale.gemininpc.utils;
 import io.marioslab.basis.template.TemplateContext;
 import org.checkerframework.checker.units.qual.A;
 import org.pale.gemininpc.GeminiNPCTrait;
+import org.pale.gemininpc.Plugin;
 
 import java.util.*;
 
 /**
  * Useful functions for templates wrapped in a class.
+ * This is created afresh every time we need to generate the system prompt for the NPC, which
+ * happens the first time we talk to it.
  */
 public class TemplateFunctions {
     final GeminiNPCTrait trait;
     Random prng;
-    
+
     public TemplateFunctions(GeminiNPCTrait trait) {
         this.trait = trait;
-        prng = new Random(trait.getNPC().getName().hashCode());
+        // by default, the PRNG is seeded by the hashcode of the NPC name.
+        // This can be overriden by "setseed" in a template, if you really don't like the name.
+        prng = new Random(trait.seedString.hashCode());
     }
 
     // function that takes a List<Object> and returns a string
@@ -97,7 +102,7 @@ public class TemplateFunctions {
     }
 
     /**
-     * Choose a random string from a list of strings using the PRNG seeded by setPRNGSeed.
+     * Choose a random string from a list of strings using the prng object
      */
     private final ListStringFunction stringChooseFunction = (args) -> {
         return chooseItem(args, false); // no need to remove, this is a single choice.
@@ -128,25 +133,26 @@ public class TemplateFunctions {
      * Given two ints return random.nextint(a,b) - a is inclusive, b is exclusive.
      */
 
-    public final IntIntToIntFunction randomFunction = (a, b) -> prng.nextInt(a, b);
+    private final IntIntToIntFunction randomFunction = (a, b) -> prng.nextInt(a, b);
 
-    public final StringStringFunction dropFunction = (a) -> "";
+    private final StringStringFunction dropFunction = (a) -> "";
 
     Map<String, Map<String,String>> maps = new HashMap<>();
     Map<String, List<String>> lists = new HashMap<>();
 
-    public final StringStringStringToStringFunction addToMapFunction = (mapname, key, value) -> {
+    private final StringStringStringToStringFunction addToMapFunction = (mapname, key, value) -> {
         Map<String, String> map = maps.computeIfAbsent(mapname,k -> new HashMap<>());
         map.put(key,value);
         return "";
     };
-    public final StringObjectFunction getMapFunction = mapname -> maps.computeIfAbsent(mapname,k -> new HashMap<>());
+    private final StringObjectFunction getMapFunction = mapname -> maps.computeIfAbsent(mapname,k -> new HashMap<>());
 
-    public final StringStringToStringFunction addToListFunction = (listname, value) -> {
+    private final StringStringToStringFunction addToListFunction = (listname, value) -> {
         List<String> lst = lists.computeIfAbsent(listname,k -> new ArrayList<>());
         lst.add(value);
         return "";
     };
 
-    public final StringObjectFunction getListFunction = listname -> lists.computeIfAbsent(listname, k-> new ArrayList<>());
+    private final StringObjectFunction getListFunction = listname -> lists.computeIfAbsent(listname, k-> new ArrayList<>());
+
 }

@@ -105,6 +105,9 @@ public class Persona {
             tc.set(key, templateValues.get(key));
         }
 
+        var logger = Plugin.getInstance().getLogger();
+//        logger.info("Generating system instructions for "+t.getNPC().getName());
+
         // create a template function object for this NPC
         TemplateFunctions f = new TemplateFunctions(t);
         f.addFunctions(tc);
@@ -138,17 +141,18 @@ public class Persona {
         // and render it
         tl.set("temp", string);
         Template pt = tl.load("temp");
-        string = pt.render(tc);
+        String processed = pt.render(tc);
         // now maybe replace newlines, because we need the persona to be JSONable (probably).
         if(plugin.removeNewlinesFromPersona)
-            string = string.replaceAll("\\n"," ");
+            processed = processed.replaceAll("\\n"," ");
         // then set it back into the template context as "persona"
-        tc.set("persona", string);
+        tc.set("persona", processed);
 
         // load and render the common template, which will include the persona
         Template template = tl.load("common"); // ffs - clunky that we have to do the set/load like this
         String s= template.render(tc);
         s = s.replaceAll("\\n\\n+", "\n"); // replace multiple newlines
+//        logger.info("Instructions: "+s);
         return s;
     }
 

@@ -88,6 +88,7 @@ public class GeminiNPCTrait extends Trait {
     public long timeSpawned = 0;    // ticks since spawn
     Location navTarget;     // current path destination using our waypoints (not Chatcitizen's) or null
     boolean debug;
+    public String seedString = null;
 
     double npcRespondProb = 0; // probability that we will respond to something an NPC says (as opposed to a player)
 
@@ -209,6 +210,9 @@ public class GeminiNPCTrait extends Trait {
         gender = key.getString("gender", null);
         // load the NPC respond probability
         npcRespondProb = key.getDouble("npc_respond_prob", Plugin.getInstance().defaultNPCRespondProb);
+        // and the seed if it has been set - otherwise we'll use the name which was set in onAttach
+        seedString = key.getString("seed_string", seedString);
+
         waypoints.load(key);
     }
 
@@ -216,6 +220,7 @@ public class GeminiNPCTrait extends Trait {
     public void save(DataKey key) {
         key.setString("pname", personaName);
         key.setString("gender",gender);
+        key.setString("seed_string", seedString);
         key.setDouble("npc_respond_prob", npcRespondProb);
 
         waypoints.save(key);
@@ -239,6 +244,7 @@ public class GeminiNPCTrait extends Trait {
     @Override
     public void onAttach() {
         plugin.getServer().getLogger().info(npc.getName() + " has been assigned GeminiNPC!");
+        seedString = npc.getName();
     }
 
     /**
@@ -997,15 +1003,19 @@ public class GeminiNPCTrait extends Trait {
                 plugin.getServer().getLogger().info("Sending to AI: " + outString);
                 plugin.request_count++;
                 // here we get the response
-                Chat.Response response = chat.sendAndGetResponse(outString);
-                if (response == null) {
-                    plugin.getServer().getLogger().severe("No response");
-                    return;
+                try {
+                    Chat.Response response = chat.sendAndGetResponse(outString);
+                    if (response == null) {
+                        plugin.getServer().getLogger().severe("No response");
+                        return;
+                    }
+                    // otherwise we're all good. Queue the message.
+                    queue.offer(response);
+                    plugin.getServer().getLogger().info("Response received: "+ response);
+
+                } catch(Exception e){
+                    plugin.getLogger().severe("That's weird, an exception: "+e.getMessage());
                 }
-                plugin.getServer().getLogger().info("Response received");
-                // put that in the queue
-                // otherwise we're all good. Queue the message.
-                queue.offer(response);
             }).start();
         }
     }
@@ -1051,7 +1061,7 @@ public class GeminiNPCTrait extends Trait {
      */
     void showInfo(CallInfo c) {
         c.msg("NPC " + getNPC().getName());
-        c.msg("  org.pale.gemininpc.ai.Persona: " + personaName + "gender: "+gender);
+        c.msg("  Persona: " + personaName + ", gender: "+gender);
         c.msg("  NPC respond probability: "+npcRespondProb);
         c.msg("  Waypoints:");
         for (String name : waypoints.getWaypointNames()) {

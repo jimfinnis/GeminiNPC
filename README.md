@@ -38,8 +38,10 @@ personae-directories:
     - plugins/GeminiNPC/otherpersonae
 ```
 
-Then you can select an NPC (this is a Citizens2 plugin, so see their
-documentation for that) and the trait and a persona with 
+## Adding the trait to an NPC
+
+Once you've set stuff up you can select an NPC (this is a Citizens2 plugin, so see their
+documentation for that) and add the trait and a persona with 
 
 ```
 trait gemininpc
@@ -53,6 +55,42 @@ in life.
 
 If you talk to the bot after assigning the trait but before setting its persona, you'll get the rather
 bland default persona.
+
+## Commands
+
+* `/gemini help [<command>]` - list commands or get help for a command
+
+### Persona and NPC management
+
+* `/gemini persona <persona>` - set the persona for the currently selected NPC
+* `/gemini gender <gender>` - set the NPC's gender
+* `/gemini setrespond <float>` - set the probability (0-1) that this NPC will respond to another NPC (to avoid chat loops)
+* `/gemini setseed <string>` - set the NPC's PRNG seed for templating - by default it is generated from the character's name. Useful when `choose` or `pick` gives you results you don't like for a name that you do.
+* `/gemini list` - list all available personae
+* `/gemini npcs` - list all NPCs with this trait
+* `/gemini info` - get info on the selected NPC
+* `/gemini qs <npcname> p=<persona> g=<gender>` - quick set of gender and persona on named NPC (perhaps more later)
+
+### Admin and debugging
+
+* `/gemini usage` - show usage stats
+* `/gemini reload` - reload all config data and reset all AIs
+* `/gemini modelinfo` - get data on the LLM model being used
+* `/gemini reqs` - show number of API requests made
+* `/gemini debug` - toggle debugging (mainly paths, not much use)
+* `/gemini disable` - disable API requests
+* `/gemini enable` - enable API requests
+* `/gemini dumpmem` - dump NPC's memory to console
+* `/gemini prompt` - show system prompt on console
+
+### Waypoint management
+
+* `/gemini wp <name> <description>..` - set a waypoint for the selected NPC at your current location
+* `/gemini wpdel <name>` - delete a named waypoint in the currently selected NPC
+* `/gemini wploc <name>` - change a named waypoint's location to the player's location
+* `/gemini wpdesc <name> <desc>...` - change a named waypoint's description
+* `/gemini go <name>` - force the NPC to path to one of its waypoints
+
 
 ### YAML persona files
 Persona files can be plain text as above, but they can also be YAML files. The structure of such a file
@@ -137,6 +175,7 @@ The "gender" of an NPC can be set in three ways:
 1. By setting the gender in the NPC trait using the `/gemini gender` command. This will override the following two methods.
 2. By setting the `default-gender` in the persona file. This will be used if the first method is not used.
 3. By setting the `default-gender` in the main config file. This will be used if the first two methods are not used.
+4. Using the `/gemini qs` command (q.v.)
 
 Setting the gender does only one thing - it sets the `gender` template value, which can then be used in the persona
 through the templating system. The value is just a string and can be anything you like, but the default is
