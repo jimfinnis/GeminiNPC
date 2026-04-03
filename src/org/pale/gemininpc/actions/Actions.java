@@ -20,7 +20,7 @@ public class Actions {
         this.plugin = plugin;
     }
 
-    @Action
+    @Action(usage="give ITEM", desc="Given an item to a player. ITEM must be a Minecraft material.")
     public void give(ActionInfo a){
         String mname = a.args().toUpperCase().trim().replaceAll(" ", "_");
         Material mat = Material.getMaterial(mname);
@@ -31,7 +31,7 @@ public class Actions {
         }
     }
 
-    @Action
+    @Action(usage="setguard PLAYER", desc="Start guarding the specified player.", group="sentinel")
     public void setguard(ActionInfo a){
         if(a.trait().isSentinel()){
             Sentinel s = plugin.sentinelPlugin;
@@ -53,7 +53,7 @@ public class Actions {
         }
     }
 
-    @Action
+    @Action(usage="unguard", desc="Stop guarding the player you are currently guarding.", group="sentinel")
     public void unguard(ActionInfo a){
         if(a.trait().isSentinel()){
             plugin.sentinelPlugin.setGuard(a.npc(), null);
@@ -63,7 +63,7 @@ public class Actions {
         }
     }
 
-    @Action
+    @Action(usage="go WAYPOINT", desc="Go to a known waypoint. WAYPOINT must be a waypoint you know about.", group="waypoints")
     public void go(ActionInfo a){
         String name = a.args().trim();
         if(name.equalsIgnoreCase("none")){
@@ -79,7 +79,14 @@ public class Actions {
         }
     }
 
-    @Action
+    @Action(usage="writebook TITLE|TEXT",
+    desc="Write a book and give it to the player. TITLE should be a " +
+            "few words. TEXT can be as long as you can manage. Write in a more formal " +
+            "way than you speak. Make sure the text is appropriate for the text of a book. " +
+            "\"TITLE\" in the action should be replaced by the title, and \"TEXT\" by the text. " +
+            "Write books rarely or when requested to do so.",
+            group="writer"
+    )
     public void writebook(ActionInfo a){
         String bookdata = a.args().trim();
         // split into title and text by vertical bar

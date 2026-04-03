@@ -1,12 +1,15 @@
 package org.pale.gemininpc.actions;
 
 import org.bukkit.entity.Player;
+import org.jetbrains.annotations.NotNull;
 import org.pale.gemininpc.GeminiNPCTrait;
 import org.pale.gemininpc.Plugin;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 import static org.pale.gemininpc.commands.CommandRegistry.sortedMethods;
@@ -14,22 +17,27 @@ import static org.pale.gemininpc.commands.CommandRegistry.sortedMethods;
 /**
  * Registry of actions
  */
-public class ActionRegistry {
-    private record Entry(String name, Object o, Method m) {};
+public class ActionRegistry  {
+
+    public record Entry(String name, Object o, Method m, Action act) {};
 
     private final Map<String, Entry> registry = new HashMap<>();
 
+    public Map<String,Entry> getMap(){
+        return Collections.unmodifiableMap(registry);
+    }
+
     public void register(Object handler){
         for(Method m : sortedMethods(handler)){
-            Action cmd = m.getAnnotation(Action.class);
-            if(cmd!=null){
+            Action act = m.getAnnotation(Action.class);
+            if(act!=null){
                 Class<?>[] params = m.getParameterTypes();
                 if(params.length != 1 || !params[0].equals(ActionInfo.class)){
                     Plugin.warn("Error in @Action on method "+m.getName()+": parameter must be one CallInfo");
                 } else {
-                    String name = cmd.name();
+                    String name = act.name();
                     if(name.isEmpty())name = m.getName();
-                    registry.put(name, new Entry(name, handler, m));
+                    registry.put(name, new Entry(name, handler, m, act));
                 }
             }
         }

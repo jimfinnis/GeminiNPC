@@ -14,5 +14,8 @@ import java.lang.annotation.Target;
 
 public @interface Action {
     String name() default "";       // the name of the action, by default the name of the method.
+    String usage();                 // usage info e.g. "give ITEM"
+    String desc();                  // description
+    String group() default "default";   // what action group?
 }
 

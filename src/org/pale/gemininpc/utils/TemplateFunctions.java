@@ -4,6 +4,8 @@ import io.marioslab.basis.template.TemplateContext;
 import org.checkerframework.checker.units.qual.A;
 import org.pale.gemininpc.GeminiNPCTrait;
 import org.pale.gemininpc.Plugin;
+import org.pale.gemininpc.actions.Action;
+import org.pale.gemininpc.actions.ActionRegistry;
 
 import java.util.*;
 
@@ -13,7 +15,7 @@ import java.util.*;
  * happens the first time we talk to it.
  */
 public class TemplateFunctions {
-    final GeminiNPCTrait trait;
+    GeminiNPCTrait trait = null;
     Random prng;
 
     public TemplateFunctions(GeminiNPCTrait trait) {
@@ -78,6 +80,10 @@ public class TemplateFunctions {
         tc.set("map", getMapFunction); // get a map by name
         tc.set("listadd", addToListFunction); // append an item to a list, creating a new list if needed. Args: listname,v
         tc.set("list", getListFunction); // get a list by name
+
+        // add actions for use in an "actions" dict. Argument is an "action group" name e.g. "default" or "sentinel",
+        // and adds data to the "actions" map which you can then get with "map".
+        tc.set("actions", actionsFunction);
     }
 
     private String chooseItem(Object item, boolean remove) {
@@ -155,4 +161,11 @@ public class TemplateFunctions {
 
     private final StringObjectFunction getListFunction = listname -> lists.computeIfAbsent(listname, k-> new ArrayList<>());
 
+    private final StringStringFunction actionsFunction = (groupname) -> {
+        Map<String, String> map = maps.computeIfAbsent("actions",k -> new HashMap<>());
+        for(Map.Entry<String, ActionRegistry.Entry> e: trait.plugin.actionRegistry.getMap().entrySet() ){
+            map.put(e.getKey(), e.getValue().act().desc());
+        }
+        return "";
+    };
 }

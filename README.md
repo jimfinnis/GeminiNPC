@@ -137,6 +137,7 @@ cannot be chosen multiple times. Sublists are permitted - see below.
 * `map(mapname)` - return the map given the name, creating the map if not found; the map can then have the standard Java map methods called and can be iterated in a for-loop (see the Basis docs)
 * `listadd(listname, value)` - add a value to a list, creating the list if not found
 * `list(listname)` - return a list as a Java List object
+* `actions(group)` - adds the given actions group to the "actions" map (see Actions)
 * `drop(value)` - calculates the value but returns an empty string; occasionally useful because Basis will otherwise always render any returned value
 
 Remember that this code only runs once, so if you want to change the template values, you'll need to reload the NPCs
@@ -291,6 +292,40 @@ which means that there is a 10% chance that an NPC will respond to another NPC's
 
 This can be changed to each NPC with the '/gemini setrespond <probability>' command, where the probability is a
 number between 0 and 1.
+
+## Actions
+
+As well as responding with text, the LLM can respond with an "action" to perform. These are given in the `Actions` class
+and fall into groups. Currently:
+
+* `default` handles giving items
+* `waypoints` contains actions for moving to waypoints
+* `sentinel` handles actions for guarding/unguarding a player
+* `writer` allows NPCs to write books and give them to the player
+
+The `actions` template function adds a group to the "actions" map. It's used like this:
+
+```
+{{actions("default")}}
+
+
+{{if isSentinel}}
+ {{actions("sentinel")}}
+{{end}}
+{{if hasWaypoints}}
+ {{actions("waypoints")}}
+{{end}}
+
+  "actions": {
+{{for k,v in map("actions")}}
+    "{{k}}" : "{{v}}",
+{{end}}
+  },
+```
+You can see that the first section adds various groups to the map, then the last section renders the map
+to the JSON. The "writer" group is added by the various personae who can write books.
+
+
 
 ## Other random notes
 These are a bit disorganised! 

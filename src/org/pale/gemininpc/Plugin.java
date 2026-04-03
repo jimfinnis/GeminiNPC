@@ -63,7 +63,7 @@ public class Plugin extends JavaPlugin implements Listener {
     double defaultNPCRespondProb = 0;
 
     private final CommandRegistry commandRegistry = new CommandRegistry(ROOTCMDNAME);
-    final ActionRegistry actionRegistry = new ActionRegistry();
+    public final ActionRegistry actionRegistry = new ActionRegistry();
 
     static final int TICK_RATE = 20;
     public String defaultGender = "non-binary";
