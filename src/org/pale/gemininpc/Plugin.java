@@ -26,9 +26,11 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 
 import org.jetbrains.annotations.NotNull;
+import org.pale.gemininpc.actions.ActionRegistry;
+import org.pale.gemininpc.actions.Actions;
 import org.pale.gemininpc.ai.Model;
 import org.pale.gemininpc.ai.Persona;
-import org.pale.gemininpc.command.*;
+import org.pale.gemininpc.commands.*;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
 import org.pale.gemininpc.waypoints.Waypoint;
 import org.pale.gemininpc.waypoints.Waypoints;
@@ -60,11 +62,13 @@ public class Plugin extends JavaPlugin implements Listener {
     // as opposed to a player
     double defaultNPCRespondProb = 0;
 
-    private final Registry commandRegistry = new Registry(ROOTCMDNAME);
+    private final CommandRegistry commandRegistry = new CommandRegistry(ROOTCMDNAME);
+    final ActionRegistry actionRegistry = new ActionRegistry();
+
     static final int TICK_RATE = 20;
     public String defaultGender = "non-binary";
     // interfaces to other plugins
-    Sentinel sentinelPlugin;
+    public Sentinel sentinelPlugin;
 
     /**
      * Use this to get plugin instances - don't play silly buggers creating new
@@ -141,6 +145,9 @@ public class Plugin extends JavaPlugin implements Listener {
 
         // register the commands automatically - these are tagged with @Cmd.
         commandRegistry.register(this); // register commands
+
+        // register the Actions similarly
+        actionRegistry.register(new Actions(this));
 
         loadConfigAndCreateModel();
 
@@ -702,6 +709,7 @@ public class Plugin extends JavaPlugin implements Listener {
             c.msg(ChatColor.RED+"No such NPC "+name);
             return;
         }
+        t.update(); // force an update, handy in debugging
 
         for(int i=1;i<args.length;i++){
             String arg = args[i];

@@ -30,9 +30,10 @@ import org.bukkit.entity.Player;
 
 import org.mcmonkey.sentinel.SentinelTrait;
 
+import org.pale.gemininpc.actions.Action;
 import org.pale.gemininpc.ai.Chat;
 import org.pale.gemininpc.ai.Persona;
-import org.pale.gemininpc.command.CallInfo;
+import org.pale.gemininpc.commands.CallInfo;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
 import org.pale.gemininpc.utils.ItemManipulation;
 import org.pale.gemininpc.utils.TextUtils;
@@ -62,7 +63,7 @@ public class GeminiNPCTrait extends Trait {
     }
 
 
-    void log_debug(String s){
+    public void log_debug(String s){
         if(debug)Plugin.log(npc.getName()+ ": "+s);
     }
 
@@ -388,6 +389,7 @@ public class GeminiNPCTrait extends Trait {
      * @param p       the player in the reponse (i.e. who we are responding to)
      * @param action  the action
      */
+    /*
     private void performAction(Player p, String action) {
         Sentinel s = Plugin.getInstance().sentinelPlugin;
         if (action.startsWith("give ")) {
@@ -453,11 +455,9 @@ public class GeminiNPCTrait extends Trait {
             // or if the player had no inventory room.
             Plugin.log("Book written");
             ItemManipulation.giveItemToPlayerOrDrop(npc,p, book);
-
         }
-
     }
-
+*/
     /**
      * Handle a JSON response object, which contains response, command and player elements.
      */
@@ -479,11 +479,12 @@ public class GeminiNPCTrait extends Trait {
             Plugin.log("null msg");
         }
         if (action != null && !action.isBlank()) {
-            performAction(playerName==null?null:plugin.getServer().getPlayer(playerName), action);
-            String msg = ChatColor.AQUA + "[" + npc.getFullName() + "] DOES: " + ChatColor.GOLD + action;
-            for (NearbyPlayer p : nearbyPlayers) {
+//            performAction(playerName==null?null:plugin.getServer().getPlayer(playerName), action);
+            plugin.actionRegistry.handleAction(this,
+                    playerName==null?null:plugin.getServer().getPlayer(playerName),
+                    action);
+            Plugin.log("ACTION HANDLING: "+action);
 
-            }
         }
     }
 
@@ -491,7 +492,7 @@ public class GeminiNPCTrait extends Trait {
      * This is called every tick, and is where we do the work. We check the queue for messages,
      * and if there are any, we send them to the players in range.
      */
-    private void update() {
+    void update() {
         checkPurchaseTimer();   // check if we have a purchase timer that has expired, and if so, send the purchases to the AI.
         // check the queue - if there are any messages, speak them.
         while (!queue.isEmpty()) {
@@ -1041,7 +1042,7 @@ public class GeminiNPCTrait extends Trait {
         }
     }
 
-    void pathTo(String name) throws Waypoints.Exception {
+    public void pathTo(String name) throws Waypoints.Exception {
         navTarget = waypoints.pathTo(this, name);
     }
 

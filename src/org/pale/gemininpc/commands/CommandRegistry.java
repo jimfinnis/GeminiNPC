@@ -1,4 +1,4 @@
-package org.pale.gemininpc.command;
+package org.pale.gemininpc.commands;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
@@ -13,15 +13,16 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 import org.pale.gemininpc.Plugin;
 
-public class Registry {
+public class CommandRegistry {
+
     class Entry {
         final String name;
         final String permission;
         final Method m;
         final Object obj;
         private final Cmd cmd;
-        
-        
+
+
         Entry(String name,String perm,Cmd cmd,Object o,Method m){
             this.permission=perm;
             this.cmd=cmd;
@@ -29,7 +30,7 @@ public class Registry {
             this.obj=o;
             this.name = name;
         }
-        
+
         private boolean checkPermission(Player p){
             return p==null || permission==null || p.hasPermission(permission);
         }
@@ -65,7 +66,7 @@ public class Registry {
     private final Map<String,Entry> registry = new HashMap<>();
     private final String rootCmdName;
     
-    public Registry(String rootCmdName){
+    public CommandRegistry(String rootCmdName){
         this.rootCmdName = rootCmdName;
     }
     
@@ -76,7 +77,7 @@ public class Registry {
             if(cmd!=null){
                 Class<?>[] params = m.getParameterTypes();
                 if(params.length != 1 || !params[0].equals(CallInfo.class)){
-                    Plugin.warn("Error in @Sub on method "+m.getName()+": parameter must be one CallInfo");
+                    Plugin.warn("Error in @Cmd on method "+m.getName()+": parameter must be one CallInfo");
                 } else {					
                     String name = cmd.name();
                     if(name.isEmpty())name = m.getName();
@@ -116,7 +117,8 @@ public class Registry {
      * @param handler the object to reflect
      * @return an ArrayList of methods.
      */
-    private ArrayList<Method> sortedMethods(Object handler) {
+
+    public static ArrayList<Method> sortedMethods(Object handler) {
         Map<String, Method> methodMap = new TreeMap<>();
         for (Method method : handler.getClass().getDeclaredMethods()) {
             methodMap.put(method.getName(), method);
