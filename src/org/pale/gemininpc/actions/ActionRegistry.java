@@ -7,10 +7,7 @@ import org.pale.gemininpc.Plugin;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 
 import static org.pale.gemininpc.commands.CommandRegistry.sortedMethods;
 
@@ -21,12 +18,25 @@ public class ActionRegistry  {
 
     public record Entry(String name, Object o, Method m, Action act) {};
 
-    private final Map<String, Entry> registry = new HashMap<>();
+    // map of String->Entry for each group
+    private final Map<String, TreeMap<String,Entry>> registry = new TreeMap<>();
 
-    public Map<String,Entry> getMap(){
-        return Collections.unmodifiableMap(registry);
+    // map of String->Entry for all actions, used in handling actions.
+    private final Map<String, Entry> allActions = new HashMap<>();
+
+    /**
+     * Get the map for a given action group
+     * @param groupname name of the group
+     * @return map
+     */
+    public Map<String,Entry> getMap(String groupname){
+        return registry.computeIfAbsent(groupname, k->new TreeMap<String,Entry>());
     }
 
+    /**
+     * Register all @Action annotated methods in the provided class
+     * @param handler the container for the methods
+     */
     public void register(Object handler){
         for(Method m : sortedMethods(handler)){
             Action act = m.getAnnotation(Action.class);
@@ -35,9 +45,16 @@ public class ActionRegistry  {
                 if(params.length != 1 || !params[0].equals(ActionInfo.class)){
                     Plugin.warn("Error in @Action on method "+m.getName()+": parameter must be one CallInfo");
                 } else {
+                    // get the action's name field; if there isn't one use the method name
                     String name = act.name();
                     if(name.isEmpty())name = m.getName();
-                    registry.put(name, new Entry(name, handler, m, act));
+                    // get the map for the action's group, creating one if required
+                    TreeMap<String,Entry> groupmap = registry.computeIfAbsent(act.group(), k->new TreeMap<>());
+                    // and put the action into it.
+                    Entry e = new Entry(name, handler, m, act);
+                    groupmap.put(name, e);
+                    // also add it to all actions
+                    allActions.put(name,e);
                 }
             }
         }
@@ -51,7 +68,7 @@ public class ActionRegistry  {
         if(act.isEmpty())
             return;
         String args = out.length<2 ? "" : out[1];
-        Entry e = registry.getOrDefault(act,null);
+        Entry e = allActions.getOrDefault(act,null);
         var logger = Plugin.getInstance().getLogger();
         if(e == null){
             logger.info("Unknown action "+act+" from NPC "+npcname);

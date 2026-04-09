@@ -12,7 +12,9 @@ import org.pale.gemininpc.utils.TemplateFunctions;
 import org.pale.gemininpc.waypoints.Waypoints;
 
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -50,6 +52,8 @@ public class Persona {
     public Persona(String name, Path path) {
         // if the filename has a ".yml" extension, it's a yaml file otherwise it's plain text.
         var plugin = Plugin.getInstance();
+        plugin.getLogger().info("Loading "+path);
+
         if (path.toString().endsWith(".yml")) {
             loadYamlConfig(name, path);
         } else {
@@ -81,6 +85,26 @@ public class Persona {
                 templateValues.put(key, c.get(key));
             }
         }
+
+        // there may be more template variables in some extra files specified in my own config
+        // The root of relative file paths here is assumed to be the plugin's data folder
+        List<String> lst = yaml.getStringList("yaml-files");
+        for(String filename: lst){  // above line will give empty list if data not found
+            Path p = Paths.get(filename);
+            if(!p.isAbsolute()){
+                p = Paths.get(plugin.getDataFolder().getAbsolutePath(),filename);
+            }
+            YamlConfiguration yaml2 = YamlConfiguration.loadConfiguration(p.toFile());
+            plugin.getLogger().severe("Loaded "+p.toAbsolutePath());
+            for (String key : yaml2.getKeys(false)) {
+                templateValues.put(key, yaml2.get(key));
+            }
+        }
+
+        for(String k: templateValues.keySet()){
+            plugin.getLogger().severe("Key: "+k+" value: "+templateValues.get(k));
+        }
+
     }
 
     /**
@@ -102,6 +126,7 @@ public class Persona {
 
         // add our own values (which may override those given in the main config)
         for (String key : templateValues.keySet()) {
+            plugin.getLogger().warning("Template value "+key+"="+templateValues.get(key));
             tc.set(key, templateValues.get(key));
         }
 

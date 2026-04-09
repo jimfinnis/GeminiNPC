@@ -692,7 +692,7 @@ public class Plugin extends JavaPlugin implements Listener {
     }
 
     @SuppressWarnings("unused")
-    @Cmd(desc="quick set of persona and/or gender, e.g. qs Boris g=male p=soldier1")
+    @Cmd(desc="quick set of persona and/or gender, e.g. qs Boris g=male p=soldier1. If name is 's', selected npc is used")
     public void qs(CallInfo c){
         String[] args = c.getArgs();
         if(args.length<1){
@@ -700,11 +700,20 @@ public class Plugin extends JavaPlugin implements Listener {
             return;
         }
         String name = args[0];
-        GeminiNPCTrait t = chatters.stream()
-                .filter(npc -> npc.getName().equals(name))
-                .findFirst()
-                .map(Plugin::getTraitFor)
-                .orElse(null);
+        GeminiNPCTrait t;
+        if(name.equals("s")) {
+            t = c.getCitizen();
+            if(t == null){
+                c.msg(ChatColor.RED+"No NPC selected");
+                return;
+            }
+        } else {
+            t = chatters.stream()
+                    .filter(npc -> npc.getName().equals(name))
+                    .findFirst()
+                    .map(Plugin::getTraitFor)
+                    .orElse(null);
+        }
         if(t==null){
             c.msg(ChatColor.RED+"No such NPC "+name);
             return;

@@ -163,7 +163,8 @@ public class TemplateFunctions {
 
     private final StringStringFunction actionsFunction = (groupname) -> {
         Map<String, String> map = maps.computeIfAbsent("actions",k -> new HashMap<>());
-        for(Map.Entry<String, ActionRegistry.Entry> e: trait.plugin.actionRegistry.getMap().entrySet() ){
+        for(Map.Entry<String, ActionRegistry.Entry> e: trait.plugin.actionRegistry.getMap(groupname).entrySet() ){
+            Plugin.getInstance().getLogger().info("  adding action "+e.getKey()+" from group "+groupname);
             map.put(e.getKey(), e.getValue().act().desc());
         }
         return "";

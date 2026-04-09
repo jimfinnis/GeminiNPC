@@ -221,6 +221,42 @@ template-values:
         - You are a little too fond of swearing.
 ```
 
+### Extra data
+
+You can also supply some extra data to certain personae by specifying some `yaml-files` in that personae's YAML config.
+For example, a YAML persona could be:
+```yaml
+string: |
+    You are the Lady Chanter of the Convent.
+    {{choose(relationships)}} {{choose(nuns)}}.
+    {{choose(relationships)}} {{choose(nuns)}}.
+
+yaml-files: 
+    - special/nuns.yml
+```
+and then in the `special/nuns.yaml` file in the plugin's data directory you could have:
+```yaml
+nuns:
+ - Frieda
+ - Helga
+ - Roshilde
+ - Gertrud
+ - Ylva
+ - the Lady Chanter
+
+relationships:
+ - You like
+ - You dislike
+ - You cordially loathe
+ - You are in love with
+ - You are in a rivalry with
+```
+You might think it a good idea to have the
+```yaml
+{{choose(relationships)}} {{choose(nuns)}}
+```
+block inside a template variable, but that won't work - templates inside template variables aren't currently processed. So
+we just repeat it.
 
 
 ## What is sent
@@ -303,7 +339,7 @@ and fall into groups. Currently:
 * `sentinel` handles actions for guarding/unguarding a player
 * `writer` allows NPCs to write books and give them to the player
 
-The `actions` template function adds a group to the "actions" map. It's used like this:
+The `actions` template function adds a group to the "actions" map. It's used like this in the `common` template:
 
 ```
 {{actions("default")}}
@@ -323,7 +359,8 @@ The `actions` template function adds a group to the "actions" map. It's used lik
   },
 ```
 You can see that the first section adds various groups to the map, then the last section renders the map
-to the JSON. The "writer" group is added by the various personae who can write books.
+to the JSON. The "writer" group is added by the various personae who can write books; the persona is templated
+before this point.
 
 
 

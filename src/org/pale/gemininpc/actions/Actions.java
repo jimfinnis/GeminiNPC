@@ -3,7 +3,6 @@ package org.pale.gemininpc.actions;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
-import org.pale.gemininpc.GeminiNPCTrait;
 import org.pale.gemininpc.Plugin;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
 import org.pale.gemininpc.utils.ItemManipulation;
@@ -103,8 +102,5 @@ public class Actions {
         // or if the player had no inventory room.
         Plugin.log("Book written");
         ItemManipulation.giveItemToPlayerOrDrop(a.npc(),a.target(), book);
-
-
     }
-
 }
