@@ -91,6 +91,26 @@ public class TemplateTest {
         tc.set("greeting", "Hello, world!");
         String rendered = t.render(tc);
         assertEquals("greeting: Hello, world!", rendered);
+    }
+
+    /**
+     * String join test - requires adding String to the context!
+     */
+    @Test
+    public void testJoin(){
+        TemplateLoader.MapTemplateLoader loader = new TemplateLoader.MapTemplateLoader();
+        loader.set("testTemplate", "{{String.join(\",\",list)}}");
+        Template t = loader.load("testTemplate");
+        TemplateContext tc = new TemplateContext();
+        var lst = new ArrayList<String>();
+        lst.add("foo");
+        lst.add("bar");
+        lst.add("baz");
+        tc.set("String",String.class);  // otherwise the system doesn't know about "String!"
+        tc.set("list", lst);
+
+        String rendered = t.render(tc);
+        assertEquals("foo,bar,baz", rendered);
 
 
     }

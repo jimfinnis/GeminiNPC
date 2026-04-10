@@ -84,6 +84,9 @@ public class TemplateFunctions {
         // add actions for use in an "actions" dict. Argument is an "action group" name e.g. "default" or "sentinel",
         // and adds data to the "actions" map which you can then get with "map".
         tc.set("actions", actionsFunction);
+
+        // we also add some helpful stuff from Java
+        tc.set("String",String.class);  // e.g. this lets us use String.join etc.
     }
 
     private String chooseItem(Object item, boolean remove) {
