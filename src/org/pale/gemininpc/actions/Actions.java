@@ -19,7 +19,7 @@ public class Actions {
         this.plugin = plugin;
     }
 
-    @Action(usage="give ITEM", desc="Given an item to a player. ITEM must be a Minecraft material.")
+    @Action(usage="give ITEM", desc="Given an item to a player. ITEM must be a Minecraft material. Never give a WRITTEN_BOOK with this command.")
     public void give(ActionInfo a){
         String mname = a.args().toUpperCase().trim().replaceAll(" ", "_");
         Material mat = Material.getMaterial(mname);

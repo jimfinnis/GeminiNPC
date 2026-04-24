@@ -1015,6 +1015,9 @@ public class GeminiNPCTrait extends Trait {
                     plugin.getServer().getLogger().info("Response received: "+ response);
 
                 } catch(Exception e){
+                    if(e.getMessage()==null){
+                        plugin.getLogger().severe("That's weird, an exception: "+e);
+                    }
                     plugin.getLogger().severe("That's weird, an exception: "+e.getMessage());
                 }
             }).start();
