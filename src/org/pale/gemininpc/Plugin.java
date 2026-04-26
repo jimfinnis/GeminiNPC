@@ -46,7 +46,7 @@ public class Plugin extends JavaPlugin implements Listener {
     int sched;  // scheduler handle
     int request_count = 0;   // AI request ctr
     boolean showSystemInstructions; // config option
-    int attackNotificationDuration; // config option - how many seconds does the "you have been attacked by.." last
+    public int attackNotificationDuration; // config option - how many seconds does the "you have been attacked by.." last
     boolean callsEnabled = true;    // use to disable calls to Gemini LLM model
 
     public Model model; // the LLM interface

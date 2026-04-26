@@ -3,7 +3,6 @@ package org.pale.gemininpc;
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.stream.Collectors;
 
 import com.google.gson.*;
 import net.citizensnpcs.api.CitizensAPI;
@@ -16,8 +15,6 @@ import net.citizensnpcs.trait.ShopTrait;
 import net.citizensnpcs.trait.shop.ItemAction;
 import net.citizensnpcs.trait.shop.NPCShopAction;
 import org.bukkit.*;
-import org.bukkit.block.Biome;
-import org.bukkit.block.Block;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Monster;
 import org.bukkit.event.player.PlayerTeleportEvent;
@@ -28,24 +25,19 @@ import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 
 
+import org.checkerframework.checker.units.qual.C;
 import org.mcmonkey.sentinel.SentinelTrait;
 
-import org.pale.gemininpc.actions.Action;
 import org.pale.gemininpc.ai.Chat;
+import org.pale.gemininpc.ai.ContextBuilder;
 import org.pale.gemininpc.ai.Persona;
 import org.pale.gemininpc.commands.CallInfo;
-import org.pale.gemininpc.plugininterfaces.Sentinel;
-import org.pale.gemininpc.utils.ItemManipulation;
-import org.pale.gemininpc.utils.TextUtils;
 import org.pale.gemininpc.utils.TransientNotification;
 import org.pale.gemininpc.utils.TransientNotificationMap;
 import org.pale.gemininpc.waypoints.Waypoint;
 import org.pale.gemininpc.waypoints.Waypoints;
 
-import org.pale.jcfutils.region.Region;
-import org.pale.jcfutils.region.RegionManager;
-
-import static org.pale.gemininpc.utils.Json.getDifferences;
+import javax.naming.Context;
 
 
 //This is your trait that will be applied to a npc using the /trait mytraitname command.
@@ -84,6 +76,10 @@ public class GeminiNPCTrait extends Trait {
         }
     }
 
+    // this holds an object that creates the context - the JSON object containing
+    // state data about the NPC and its environment.
+    ContextBuilder contextBuilder = null;
+
     public final Plugin plugin;           // useful pointer back to the plugin shared by all traits
     private int tickint = 0;        // a counter to slow down updates
     public long timeSpawned = 0;    // ticks since spawn
@@ -95,25 +91,21 @@ public class GeminiNPCTrait extends Trait {
 
     // So, tell me who hurt you? And when?
 
-    Entity whoDamagedBy;
-    long whenLastDamaged = -1; // -1 is never damaged or too long ago to care about
+    public Entity whoDamagedBy;
+    public long whenLastDamaged = -1; // -1 is never damaged or too long ago to care about
+
 
     // these could be the same. If the visible monster is null, there's no visible monster - but one can be "heard"
     // This object will "hang on" to the monster for a while, so we can ask the AI about it.
     // The keys we will use are "visible" and "heard"
 
-    record MonsterData(String m, double dist) {}
-    final TransientNotification<MonsterData> nearestMonster = new TransientNotification<>(30);
-    final TransientNotification<MonsterData> nearestVisibleMonster = new TransientNotification<>(20);
+    public record MonsterData(String m, double dist) {}
+    public final TransientNotification<MonsterData> nearestMonster = new TransientNotification<>(30);
+    public final TransientNotification<MonsterData> nearestVisibleMonster = new TransientNotification<>(20);
 
     // range of entity scanner
     static final double NEARBY_ENTITIES_SCAN_DIST = 10;
     static final double NEARBY_ENTITIES_SCAN_DISTY = 4;
-
-    // distances at which NPCs notice bystander players and NPCs (i.e. data about them
-    // is sent to the AI)
-    static final double VERY_CLOSE_PLAYERS_DIST = 9;
-    static final double VERY_CLOSE_PLAYERS_DISTY = 3;
 
     // distances for greeting players
     static final double GREET_DIST = 8;
@@ -384,81 +376,6 @@ public class GeminiNPCTrait extends Trait {
     }
 
     /**
-     * There's an action in the reponse and we should run it.
-     *
-     * @param p       the player in the reponse (i.e. who we are responding to)
-     * @param action  the action
-     */
-    /*
-    private void performAction(Player p, String action) {
-        Sentinel s = Plugin.getInstance().sentinelPlugin;
-        if (action.startsWith("give ")) {
-            String mname = action.substring(5).toUpperCase().trim().replaceAll(" ", "_");
-            Material mat = Material.getMaterial(mname);
-            if (mat != null) {
-                ItemManipulation.giveItemToPlayerOrDrop(npc, p, new ItemStack(mat, 1));
-            } else {
-                log_debug("Bad material name in action: " + action);
-            }
-        }
-        else if(action.startsWith("setguard")){
-            if(isSentinel()){
-                String name = action.substring(9).trim();
-                if(name.equalsIgnoreCase("none")){
-                    s.setGuard(npc, null);
-                    Plugin.log("NPC " + npc.getFullName() + " unguarded.");
-                } else {
-                    Player p2 = plugin.getServer().getPlayer(name);
-                    if(p2 != null) {
-                        s.setGuard(npc, p2.getUniqueId());
-                        Plugin.log("NPC " + npc.getFullName() + " is now guarding " + p2.getDisplayName());
-                    } else {
-                        Plugin.log("Cannot find player to guard: " + name);
-                    }
-                }
-            } else {
-                Plugin.log("NPC " + npc.getFullName() + " does not have Sentinel.");
-            }
-        } else if(action.startsWith("unguard")){
-            if(isSentinel()){
-                s.setGuard(npc, null);
-                Plugin.log("NPC " + npc.getFullName() + " unguarded.");
-            } else {
-                Plugin.log("NPC " + npc.getFullName() + " does not have Sentinel.");
-            }
-        } else if(action.startsWith("go ")){
-            String name = action.substring(3).trim();
-            if(name.equalsIgnoreCase("none")){
-                npc.getNavigator().cancelNavigation();
-                Plugin.log("NPC " + npc.getFullName() + " got a 'go none'.");
-            } else {
-                try {
-                    pathTo(name);
-                    Plugin.log("NPC " + npc.getFullName() + " is now going to waypoint "+name);
-                } catch(Waypoints.Exception e) {
-                    Plugin.log("Cannot find waypoint: " + name);
-                }
-            }
-        } else if(action.startsWith("writebook")){
-            String bookdata = action.substring(10).trim();
-            // split into title and text by vertical bar
-            String[] parts = bookdata.split("\\|", 2);
-            if(parts.length < 2){
-                parts = new String[2];
-                parts[0] = "Untitled";
-                parts[1] = bookdata;
-            }
-            String title = parts[0].trim();
-            String text = parts[1].trim();
-            ItemStack book = TextUtils.writeBook(title, npc.getFullName(), text);
-            // give the book to the player if there is one. Drop it on the ground if there isn't,
-            // or if the player had no inventory room.
-            Plugin.log("Book written");
-            ItemManipulation.giveItemToPlayerOrDrop(npc,p, book);
-        }
-    }
-*/
-    /**
      * Handle a JSON response object, which contains response, command and player elements.
      */
     private void processResponse(Chat.Response r){
@@ -487,6 +404,76 @@ public class GeminiNPCTrait extends Trait {
 
         }
     }
+
+    /**
+     * Scan nearby entities for both players and mobs. Once a second should do it.
+     * One result is the nearbyPlayers set, which will only have members IF one of the nearby
+     * players is a real player and not an NPC to avoid wasting AI requests (if a tree falls in
+     * the forest and there's no-one to hear it, does it make a sound? Here, it doesn't).
+     * Another result is the nearestMonster (could be null) and the nearestMonsterDistance
+     *
+     * @param d range in x and y
+     * @param dy range in y
+     *
+     */
+    @SuppressWarnings("SameParameterValue")
+    private void updateNearbyEntities(double d, double dy){
+        Set<GeminiNPCTrait.NearbyPlayer> r = new HashSet<>();
+        boolean nonNPCPresent = false;
+        Location myLocation = npc.getStoredLocation();
+
+        // if we can't get the entity, we can't do anything. Perhaps because it just despawned?? That's
+        // when I'm getting this error - just after NPC death events.
+        if(npc.getEntity()==null)return;
+
+        // also, it needs to be a LivingEntity so we can run hasLineOfSight on it.
+        if(!(npc.getEntity() instanceof LivingEntity))
+            return;
+
+        LivingEntity npcEntity = (LivingEntity) npc.getEntity();
+
+        for (Entity e : npc.getEntity().getNearbyEntities(d, dy, d)) {
+            if (e instanceof Player p) {
+                if (!CitizensAPI.getNPCRegistry().isNPC(e))
+                    nonNPCPresent = true;
+                if (npcEntity.hasLineOfSight(e)) {
+                    double dx = myLocation.getX() - p.getLocation().getX();
+                    double dz = myLocation.getZ() - p.getLocation().getZ();
+                    double dist = Math.sqrt(dx * dx + dz * dz);
+                    double disty = myLocation.getY() - p.getLocation().getY();
+                    r.add(new GeminiNPCTrait.NearbyPlayer(p, dist, disty));
+                    if(debug)
+                        log_debug(String.format("%s scan ADDING %s (dist %.2f dy %.2f)",
+                                npc.getEntity().getName(), p.getDisplayName(), dist, disty));
+                }
+            } else if(e instanceof Monster m){
+                String mname = m.getName();
+                // should be same world because getNearbyEntities only returns entities in the same world
+                double dist = m.getLocation().distance(npc.getEntity().getLocation());
+                GeminiNPCTrait.MonsterData nm = nearestMonster.get();
+                if (nm == null || dist < nm.dist) {
+                    nearestMonster.set(new GeminiNPCTrait.MonsterData(mname, dist));
+                    if(debug)log_debug(String.format("%s detected monster %s (dist %.2f)",
+                            npc.getEntity().getName(), mname, dist));
+                    if(npcEntity.hasLineOfSight(m)){
+                        GeminiNPCTrait.MonsterData nvm = nearestVisibleMonster.get();
+                        if (nvm == null || dist < nvm.dist) {
+                            nearestVisibleMonster.set(new GeminiNPCTrait.MonsterData(mname, dist));
+                            if(debug)log_debug(String.format("%s detected visible monster %s (dist %.2f)",
+                                    npc.getEntity().getName(), m.getName(), dist));
+                        }
+                    }
+                }
+            }
+        }
+        // if there are no *real* players nearby, don't waste AI tokens on greeting.
+        if (nonNPCPresent)
+            nearbyPlayers = r;
+        else
+            nearbyPlayers = emptySet;
+        if(debug)log_debug("Nearby: "+String.join(",",nearbyPlayers.stream().map(p->p.p.getName()).toList()));
+    }
+
 
     /**
      * This is called every tick, and is where we do the work. We check the queue for messages,
@@ -539,7 +526,7 @@ public class GeminiNPCTrait extends Trait {
         chat = null; // a new chat will need to be made.
     }
 
-    record NearbyPlayer(Player p,   // player
+    public record NearbyPlayer(Player p,   // player
                         double d,   // distance in x and z
                         double dy   // distance in y
     ){}
@@ -549,316 +536,13 @@ public class GeminiNPCTrait extends Trait {
      */
     Set<NearbyPlayer> nearbyPlayers = emptySet;
 
-
     /**
-     * Used to scan nearby entities for both players and mobs. Once a second should do it.
-     * One result is the nearbyPlayers set, which will only have members IF one of the nearby
-     * players is a real player and not an NPC to avoid wasting AI requests (if a tree falls in
-     * the forest and there's no-one to hear it, does it make a sound? Here, it doesn't).
-     * Another result is the nearestMonster (could be null) and the nearestMonsterDistance
-     *
-     * @param d range in x and y
-     * @param dy range in y
-     *
+     * Get the nearby players
      */
-    @SuppressWarnings("SameParameterValue")
-    private void updateNearbyEntities(double d, double dy){
-        Set<NearbyPlayer> r = new HashSet<>();
-        boolean nonNPCPresent = false;
-        Location myLocation = npc.getStoredLocation();
-
-        // if we can't get the entity, we can't do anything. Perhaps because it just despawned?? That's
-        // when I'm getting this error - just after NPC death events.
-        if(npc.getEntity()==null)return;
-
-        // also, it needs to be a LivingEntity so we can run hasLineOfSight on it.
-        if(!(npc.getEntity() instanceof LivingEntity))
-            return;
-
-        LivingEntity npcEntity = (LivingEntity) npc.getEntity();
-
-        for (Entity e : npc.getEntity().getNearbyEntities(d, dy, d)) {
-            if (e instanceof Player p) {
-                if (!CitizensAPI.getNPCRegistry().isNPC(e))
-                    nonNPCPresent = true;
-                if (npcEntity.hasLineOfSight(e)) {
-                    double dx = myLocation.getX() - p.getLocation().getX();
-                    double dz = myLocation.getZ() - p.getLocation().getZ();
-                    double dist = Math.sqrt(dx * dx + dz * dz);
-                    double disty = myLocation.getY() - p.getLocation().getY();
-                    r.add(new NearbyPlayer(p, dist, disty));
-                    if(debug)
-                        log_debug(String.format("%s scan ADDING %s (dist %.2f dy %.2f)",
-                                npc.getEntity().getName(), p.getDisplayName(), dist, disty));
-                }
-            } else if(e instanceof Monster m){
-                String mname = m.getName();
-                // should be same world because getNearbyEntities only returns entities in the same world
-                double dist = m.getLocation().distance(npc.getEntity().getLocation());
-                MonsterData nm = nearestMonster.get();
-                if (nm == null || dist < nm.dist) {
-                    nearestMonster.set(new MonsterData(mname, dist));
-                    if(debug)log_debug(String.format("%s detected monster %s (dist %.2f)",
-                            npc.getEntity().getName(), mname, dist));
-                    if(npcEntity.hasLineOfSight(m)){
-                        MonsterData nvm = nearestVisibleMonster.get();
-                        if (nvm == null || dist < nvm.dist) {
-                            nearestVisibleMonster.set(new MonsterData(mname, dist));
-                            if(debug)log_debug(String.format("%s detected visible monster %s (dist %.2f)",
-                                    npc.getEntity().getName(), m.getName(), dist));
-                        }
-                    }
-                }
-            }
-        }
-        // if there are no *real* players nearby, don't waste AI tokens on greeting.
-        if (nonNPCPresent)
-            nearbyPlayers = r;
-        else
-            nearbyPlayers = emptySet;
-        if(debug)log_debug("Nearby: "+String.join(",",nearbyPlayers.stream().map(p->p.p.getName()).toList()));
+    public Set<NearbyPlayer> getNearbyPlayers(){
+        return Collections.unmodifiableSet(nearbyPlayers);
     }
 
-    /**
-     * Add the inventory as a JSON array to a JsonObject, if we are carrying anything
-     */
-    private void appendInventory(JsonObject root) {
-        JsonArray arr = new JsonArray();
-        boolean isempty=true;
-        if (npc.getEntity() instanceof Player p) {
-            Inventory inv = p.getInventory();
-            ItemStack[] items = inv.getContents();
-            for (ItemStack item : items) {
-                if (item != null) {
-                    arr.add(item.getType().name());
-                    isempty = false;
-                }
-            }
-        }
-        if(!isempty)
-            root.add("inventory",arr);
-    }
-
-
-
-    /**
-     * Part of the environment builder - append any combat data to a JsonObject
-     */
-    private void appendCombatData(JsonObject root) {
-        Sentinel.SentinelData d = Plugin.getInstance().sentinelPlugin.makeData(npc);
-
-        if(whenLastDamaged >= 0){
-            // was this longer ago than a given duration?
-            long lastDamageTime = (System.currentTimeMillis()-whenLastDamaged)/1000;
-            if(lastDamageTime > plugin.attackNotificationDuration){
-                whenLastDamaged = -1;
-                root.addProperty("attacked", String.format("%s has not been attacked recently.",getNPC().getName()));
-            } else {
-                root.addProperty("attacked", String.format("%s was recently attacked by %s",
-                        getNPC().getName(), whoDamagedBy.getName()));
-            }
-        }
-
-        MonsterData nm = nearestMonster.get();
-        MonsterData nvm = nearestVisibleMonster.get();
-        if(nvm!=null) {
-            root.addProperty("recently seen", nvm.m);
-        } else if(nm!=null){
-            root.addProperty("recently heard", nm.m);
-        } else {
-            root.addProperty("recently seen", "no monsters");
-            root.addProperty("recently heard", "no monsters");
-        }
-
-        if (d != null) {
-            // first, how long ago did we see combat
-            double t = d.timeSinceAttack / 20.0; // convert to seconds
-            log_debug("Time since attack " + t);
-            if (t > 60) {
-                root.addProperty("combat", String.format("%d minutes ago", (int) t / 60));
-            } else if (t > 0) {
-                root.addProperty("combat", String.format("%d seconds ago", (int) t));
-            } else {
-                root.addProperty("combat", plugin.getText("in-combat-now"));
-            }
-            // now, are we guarding someone?
-            if (d.guarding != null)
-                root.addProperty("guarding player", d.guarding);
-            // health.
-            double h = d.health;
-            if (h >= 99.0) {
-                root.addProperty("health", "maximum");
-            } else {
-                root.addProperty("health", String.format("%d%%", (int) h));
-            }
-        }
-    }
-
-    JsonObject prevContext = null;
-
-    private static Set<Biome> biomesFromStrings(List<String> s) {
-        return s.stream()
-                .map(b -> {
-                    try {
-                        return Registry.BIOME.get(new NamespacedKey(Plugin.getInstance(), b));
-                    } catch (IllegalArgumentException e) {
-                        Plugin.log("Unknown biome: " + b);
-                        return Biome.PLAINS;
-                    }
-                })
-                .collect(Collectors.toSet());
-    }
-
-    final Set<Biome> coldBiomes = biomesFromStrings(List.of(
-            "FROZEN_OCEAN", "DEEP_FROZEN_OCEAN", "SNOWY_BEACH", "SNOWY_PLAINS",
-            "SNOWY_SLOPES", "SNOWY_TAIGA"));
-
-    final Set<Biome> coldAbove100 = biomesFromStrings(List.of(
-            "WINDSWEPT_GRAVELLY_HILLS", "WINDSWEPT_HILLS", "WINDSWEPT_FOREST", "STONY_SHORE",
-            "DRIPSTONE_CAVES"
-    ));
-
-    final Set<Biome> coldAbove160 = biomesFromStrings(List.of(
-            "TAIGA", "OLD_GROWTH_SPRUCE_TAIGA"
-    ));
-
-    final Set<Biome> coldAbove200 = biomesFromStrings(List.of(
-            "OLD_GROWTH_PINE_TAIGA"
-    ));
-
-
-    /**
-     * Get the context (environment, inventory etc.) as a JSON object, leaving out unchanged elements
-     *
-     * @return the context as a Json element, leaving out unchanged elements
-     */
-    private JsonElement getContext() {
-        Location loc = npc.getStoredLocation();
-        World w = loc.getWorld();
-
-        Block blk = loc.getBlock();
-
-        byte skyLight = blk.getLightFromSky();
-        byte blockLight = blk.getLightFromBlocks();
-        byte totalLight = blk.getLightLevel();
-
-        JsonObject root = new JsonObject();
-
-        if (skyLight == 0) {
-            root.addProperty("time", plugin.getText("no-skylight-time"));
-            root.addProperty("weather", plugin.getText("no-skylight-weather"));
-        } else {
-            long t = Objects.requireNonNull(w).getTime();
-            int hours = (int) ((t / 1000 + 6) % 24);
-            int minutes = (int) (60 * (t % 1000) / 1000);
-            String timeString = String.format("%02d:%02d", hours, minutes);
-            root.addProperty("time", timeString);
-
-            // I need to tell if it's snow or rain.
-            // this is a really rough method - it seems pretty impossible to do it properly.
-
-            boolean isSnow = isSnow(loc);
-
-            String weatherString = "clear";
-            if (timeString.equals("midnight") || timeString.equals("night"))
-                weatherString = "dark";
-            else if (timeString.equals("dawn") || timeString.equals("dusk"))
-                weatherString = "twilight";
-
-            if (w.isThundering() && w.hasStorm()) {
-                weatherString = "stormy and thundering";
-            } else if (w.hasStorm()) {
-                if (isSnow) {
-                    weatherString = "snowing";
-                } else {
-                    weatherString = "raining";
-                }
-            }
-            root.addProperty("weather", weatherString);
-        }
-
-        // add JCFUtils region data
-        RegionManager rm = RegionManager.getManager(w);
-        if (rm != null) {
-            Region region = rm.getSmallestRegion(loc);
-            if (region != null) {
-                JsonObject regionObj = new JsonObject();
-                regionObj.addProperty("name", region.name);
-                if(!region.desc.isEmpty()){
-                    regionObj.addProperty("description",region.desc);
-                }
-                root.add("region", regionObj);
-            }
-        }
-        var nearbyWp = waypoints.getNearWaypoint(loc, 100);
-        if(nearbyWp!=null){
-            if(nearbyWp.distanceSquared() <16){
-                root.addProperty("location", nearbyWp.name());
-                root.addProperty("location description", nearbyWp.waypoint().desc);
-            } else {
-                root.addProperty("nearby location", nearbyWp.name());
-                root.addProperty("nearby location description", nearbyWp.waypoint().desc);
-            }
-        }
-
-
-
-        // who is nearby?
-        if(!nearbyPlayers.isEmpty()) {
-            JsonArray json = new JsonArray();
-
-            var st = nearbyPlayers.stream()
-                    .filter(p -> p.d < VERY_CLOSE_PLAYERS_DIST
-                            && p.dy < VERY_CLOSE_PLAYERS_DISTY)      // quite close
-                    .map(p -> ChatColor.stripColor(p.p.getDisplayName()));
-            for(var s : st.toList()){
-                json.add(s);
-            }
-            root.add("nearbyPlayers", json);
-        }
-
-        // light conditions?
-        if(totalLight>0){
-            root.addProperty("light from the sun", String.format("%d/15", skyLight));
-            root.addProperty("light from lamps", String.format("%d/15", blockLight));
-
-        } else {
-            root.addProperty("light from the sun", "none");
-            root.addProperty("light from lamps", "none");
-        }
-
-        root.addProperty("world", w.getName());
-
-        // now, add the combat data - extra data will also be added if this is a Sentinel
-        appendCombatData(root);
-        // and the inventory
-        appendInventory(root);
-
-        JsonObject diffs = getDifferences(prevContext,root);
-        prevContext = root;
-        return diffs;
-    }
-
-    private boolean isSnow(Location loc) {
-        boolean isSnow = false;  // if stormy, is it snow or rain?
-        World w = loc.getWorld();
-        if (w == null) return false;
-        Biome b = w.getBiome(loc);
-
-        // get altitude of npc
-        double y = loc.getY();
-
-        if( coldBiomes.contains(b)) {
-            isSnow = true; // snow biome
-        } else if (coldAbove200.contains(b) && y > 200) {
-            isSnow = true; // above 200 in a cold biome
-        } else if (coldAbove160.contains(b) && y > 160) {
-            isSnow = true; // above 160 in a cold biome
-        } else if (coldAbove100.contains(b) && y > 100) {
-            isSnow = true; // above 100 in a cold biome
-        }
-        return isSnow;
-    }
 
     /**
      * If the chat - the link to the upstream LLM - is null, create a new one setting
@@ -997,7 +681,12 @@ public class GeminiNPCTrait extends Trait {
                     input = ChatColor.stripColor(player.getDisplayName()) + ": " + utterance;
                 }
                 JsonObject output = new JsonObject();
-                output.add("context", getContext());
+
+                // create a context builder if we don't have one
+                if(contextBuilder == null){
+                    contextBuilder = new ContextBuilder(this);
+                }
+                output.add("context", contextBuilder.getContext());
                 output.add("input", new JsonPrimitive(input));
 
                 String outString = output.toString();
@@ -1055,8 +744,9 @@ public class GeminiNPCTrait extends Trait {
      */
     void reset(){
         if(chat!=null){
+            // both of these are created on demand
             chat = null;
-            prevContext = null;
+            contextBuilder = null;
         }
     }
 
