@@ -3,14 +3,10 @@ package org.pale.gemininpc.ai;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.npc.NPC;
 import org.bukkit.*;
 import org.bukkit.block.Biome;
 import org.bukkit.block.Block;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.LivingEntity;
-import org.bukkit.entity.Monster;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
@@ -20,7 +16,6 @@ import org.pale.gemininpc.plugininterfaces.Sentinel;
 import org.pale.jcfutils.region.Region;
 import org.pale.jcfutils.region.RegionManager;
 
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -50,7 +45,7 @@ public class ContextBuilder {
         this.plugin = trait.plugin;
     }
 
-    public JsonElement getContext(){
+    public JsonObject getContext() {
         Location loc = npc.getStoredLocation();
         World w = loc.getWorld();
 
@@ -102,15 +97,15 @@ public class ContextBuilder {
             if (region != null) {
                 JsonObject regionObj = new JsonObject();
                 regionObj.addProperty("name", region.name);
-                if(!region.desc.isEmpty()){
-                    regionObj.addProperty("description",region.desc);
+                if (!region.desc.isEmpty()) {
+                    regionObj.addProperty("description", region.desc);
                 }
                 root.add("region", regionObj);
             }
         }
         var nearbyWp = trait.waypoints.getNearWaypoint(loc, 100);
-        if(nearbyWp!=null){
-            if(nearbyWp.distanceSquared() <16){
+        if (nearbyWp != null) {
+            if (nearbyWp.distanceSquared() < 16) {
                 root.addProperty("location", nearbyWp.name());
                 root.addProperty("location description", nearbyWp.waypoint().desc);
             } else {
@@ -120,23 +115,22 @@ public class ContextBuilder {
         }
 
 
-
         // who is nearby?
-        if(!trait.getNearbyPlayers().isEmpty()) {
+        if (!trait.getNearbyPlayers().isEmpty()) {
             JsonArray json = new JsonArray();
 
             var st = trait.getNearbyPlayers().stream()
                     .filter(p -> p.d() < VERY_CLOSE_PLAYERS_DIST
                             && p.dy() < VERY_CLOSE_PLAYERS_DISTY)      // quite close
                     .map(p -> ChatColor.stripColor(p.p().getDisplayName()));
-            for(var s : st.toList()){
+            for (var s : st.toList()) {
                 json.add(s);
             }
             root.add("nearbyPlayers", json);
         }
 
         // light conditions?
-        if(totalLight>0){
+        if (totalLight > 0) {
             root.addProperty("light from the sun", String.format("%d/15", skyLight));
             root.addProperty("light from lamps", String.format("%d/15", blockLight));
 
@@ -152,6 +146,18 @@ public class ContextBuilder {
         // and the inventory
         appendInventory(root);
 
+        // if there's a current state, add that
+
+        Persona p = plugin.personae.get(trait.personaName);
+        if (p != null) {
+            String s = p.getCurrentState(trait);
+            root.addProperty("current-state", (s == null) ? "normal" : s);
+        }
+        return root;
+    }
+
+    public JsonElement getContextDiffs(){
+        JsonObject root = getContext();
         // we only send the differences!
         JsonObject diffs = getDifferences(prevContext,root);
         prevContext = root;
@@ -181,7 +187,7 @@ public class ContextBuilder {
 
 
     /**
-     * Part of the environment builder - append any combat data to a JsonObject
+     * append any combat data to a JsonObject
      */
     private void appendCombatData(JsonObject root) {
         Sentinel.SentinelData d = Plugin.getInstance().sentinelPlugin.makeData(npc);

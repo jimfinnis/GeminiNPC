@@ -25,10 +25,14 @@ public class Persona {
     public String string;   // this is the base persona string before templating
     public String defaultGender = null;   // the default gender for NPCs of this persona, overriding that in the config.yml
     final public Map<String, Object> templateValues = new HashMap<>(); // template values for this persona
+    final public Map<String, Object> npcMapInitialValues = new HashMap<>(); // initial values for the NPC map (accessed by "get" and "set" template funcs)
 
     // this is the template loader that is used for all personae. We preload it with all the common stuff,
     // and then load the persona string into it as "persona" for each persona separately.
     static TemplateLoader.MapTemplateLoader tl;
+
+    // the "current-state" template, regenerated as part of the context in every response.
+    public String current_state;
 
     /**
      * This method is called once at the start of the plugin to set up the template loader.
@@ -105,20 +109,33 @@ public class Persona {
             plugin.getLogger().severe("Key: "+k+" value: "+templateValues.get(k));
         }
 
+        // store initial NPC map data
+        c = yaml.getConfigurationSection("npc-map");
+        if (c != null) {
+            for (String key : c.getKeys(false)) {
+                npcMapInitialValues.put(key, c.get(key));
+            }
+        }
+
+        // we *may* also have a string called "current-state" which is a template used every update.
+        // It contains information about what the character is currently thinking.
+
+        this.current_state = yaml.getString("current-state");
+        plugin.getLogger().severe("Current state template: "+current_state);
     }
 
     /**
-     * Apply the template system to the persona but with the PRNG keyed
-     * to the NPC's name, so it will always be the same if there are random
-     * elements. We don't want weird personality changes!
+     * Used by both the system prompt persona template and current state template to
+     * create a template context with the custom template functions and some extra things.
+     * Doesn't add stuff that's going to be constant for the NPC, such as waypoints.
+     *
      * @param t the trait
-     * @return the processed persona string
+     * @return a new template context
      */
-    public String generateSystemInstructions(GeminiNPCTrait t) {
-        var plugin = Plugin.getInstance();
+    private TemplateContext generateTemplateContext(GeminiNPCTrait t){
         // the doc advises creating a new context each time!
+        var plugin = Plugin.getInstance();
         TemplateContext tc = new TemplateContext();
-
         // add the template variables given in the main config
         for (String key : plugin.templateValues.keySet()) {
             tc.set(key, plugin.templateValues.get(key));
@@ -130,18 +147,47 @@ public class Persona {
             tc.set(key, templateValues.get(key));
         }
 
-        var logger = Plugin.getInstance().getLogger();
-//        logger.info("Generating system instructions for "+t.getNPC().getName());
-
-        // create a template function object for this NPC
-        TemplateFunctions f = new TemplateFunctions(t);
-        f.addFunctions(tc);
+        // add the functions object
+        t.getTemplateFunctions().addFunctions(tc);
 
         // set some special values
         tc.set("name",t.getNPC().getName());
         tc.set("gender",t.gender);
         tc.set("isSentinel",t.isSentinel());
         tc.set("isShop", t.isShop());
+
+        return tc;
+    }
+
+    private String generateString(TemplateContext tc, String template_string){
+        // we want to run the template engine on this string, so load it via the template loader
+        // and render it
+        var logger = Plugin.getInstance().getLogger();
+        tl.set("temp", template_string);
+        logger.severe("template string: "+template_string);
+        Template pt = tl.load("temp");
+
+        String processed = pt.render(tc);
+        logger.severe("Processed: "+processed);
+        // now maybe replace newlines, because we need the persona to be JSONable (probably).
+        if(Plugin.getInstance().removeNewlinesFromPersona)
+            processed = processed.replaceAll("\\n"," ");
+        return processed;
+    }
+
+    /**
+     * Apply the template system to the persona but with the PRNG keyed
+     * to the NPC's name, so it will always be the same if there are random
+     * elements. We don't want weird personality changes!
+     * @param t the trait
+     * @return the processed persona string
+     */
+    public String generateSystemInstructions(GeminiNPCTrait t) {
+
+        TemplateContext tc = generateTemplateContext(t);
+
+        var logger = Plugin.getInstance().getLogger();
+//        logger.info("Generating system instructions for "+t.getNPC().getName());
 /*
         for(String s: tc.getVariables()){
             Plugin.log("Template variable: "+s+" = "+tc.get(s));
@@ -162,23 +208,27 @@ public class Persona {
         tc.set("hasWaypoints", t.waypoints.getNumberOfWaypoints()>0);
 
         // get the actual persona string
-        // we want to run the template engine on this string, so load it via the template loader
-        // and render it
-        tl.set("temp", string);
-        Template pt = tl.load("temp");
-        String processed = pt.render(tc);
-        // now maybe replace newlines, because we need the persona to be JSONable (probably).
-        if(plugin.removeNewlinesFromPersona)
-            processed = processed.replaceAll("\\n"," ");
+        String persona = generateString(tc, string);
         // then set it back into the template context as "persona"
-        tc.set("persona", processed);
+        tc.set("persona", persona);
 
         // load and render the common template, which will include the persona
         Template template = tl.load("common"); // ffs - clunky that we have to do the set/load like this
         String s= template.render(tc);
         s = s.replaceAll("\\n\\n+", "\n"); // replace multiple newlines
-//        logger.info("Instructions: "+s);
         return s;
+//        logger.info("Instructions: "+s);
+    }
+
+    public String getCurrentState(GeminiNPCTrait t){
+
+        Plugin.getInstance().getLogger().severe("Generating current state for: "+t.getNPC().getName());
+        if(current_state == null)
+            return null;
+        TemplateContext tc = generateTemplateContext(t);
+        String current = generateString(tc, current_state).trim();
+        Plugin.getInstance().getLogger().info("Current state: "+current);
+        return current;
     }
 
 }

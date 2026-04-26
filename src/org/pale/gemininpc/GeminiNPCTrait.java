@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ThreadLocalRandom;
 
 import com.google.gson.*;
+import io.marioslab.basis.template.Template;
 import net.citizensnpcs.api.CitizensAPI;
 import net.citizensnpcs.api.ai.Navigator;
 import net.citizensnpcs.api.trait.Trait;
@@ -20,6 +21,7 @@ import org.bukkit.entity.Monster;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -32,10 +34,13 @@ import org.pale.gemininpc.ai.Chat;
 import org.pale.gemininpc.ai.ContextBuilder;
 import org.pale.gemininpc.ai.Persona;
 import org.pale.gemininpc.commands.CallInfo;
+import org.pale.gemininpc.utils.TemplateFunctions;
 import org.pale.gemininpc.utils.TransientNotification;
 import org.pale.gemininpc.utils.TransientNotificationMap;
 import org.pale.gemininpc.waypoints.Waypoint;
 import org.pale.gemininpc.waypoints.Waypoints;
+import org.pale.jcfutils.region.Region;
+import org.pale.jcfutils.region.RegionManager;
 
 import javax.naming.Context;
 
@@ -66,6 +71,39 @@ public class GeminiNPCTrait extends Trait {
         return npc.hasTrait(SentinelTrait.class);
     }
 
+    // do we have a particular material (minecraft name) in our inventory?
+    public Object has(String name) {
+        if (npc.getEntity() instanceof Player npcp) {
+            name = name.trim();
+            plugin.getLogger().info("looking for "+name+" in inventory of "+npc.getName());
+            Inventory inv = npcp.getInventory();
+            Material mat = Material.getMaterial(name.toUpperCase());
+            if(mat==null){
+                plugin.getLogger().info("Material not found; iterating over items");
+                // it's not a material but might be a display name, so check everything.
+                for (ItemStack item : inv.getContents()) {
+                    if (item == null) continue; // empty slot
+                    ItemMeta meta = item.getItemMeta();
+                    if(meta != null){
+                        plugin.getLogger().info("   metadata displayname="+meta.getDisplayName());
+                        plugin.getLogger().info("   metadata itemname   = "+meta.getItemName());
+                        if (meta.hasDisplayName() && meta.getDisplayName().equalsIgnoreCase(name)) {
+                            plugin.getLogger().info("Got it (DNAME)!");
+                            return true;
+                        }
+                        if (meta.hasItemName() && meta.getItemName().equalsIgnoreCase(name)){
+                            plugin.getLogger().info("Got it (CNAME)!");
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
+            return inv.contains(mat);
+        }
+        return false;
+    }
+
     enum NavCompletionCode {
         ARRIVED("arrived"),
         CANCELLED("cancelled");
@@ -78,7 +116,8 @@ public class GeminiNPCTrait extends Trait {
 
     // this holds an object that creates the context - the JSON object containing
     // state data about the NPC and its environment.
-    ContextBuilder contextBuilder = null;
+    private ContextBuilder contextBuilder = null;
+
 
     public final Plugin plugin;           // useful pointer back to the plugin shared by all traits
     private int tickint = 0;        // a counter to slow down updates
@@ -135,10 +174,14 @@ public class GeminiNPCTrait extends Trait {
     // can be creepy as heck.
     static final String DEFAULT_PERSONA = "You have no memory of who or what you are.";
 
-    String personaName = "default"; // the name of the persona
+    public String personaName = "default"; // the name of the persona
     public String gender = null;
 
     public final Waypoints waypoints = new Waypoints();
+
+    // the template functions object, created when we reset or init. Holds some state.
+
+    private TemplateFunctions templateFunctions = null;
 
     /**
      * This gets called very infrequently, randomly. And never more than the per-NPC
@@ -298,32 +341,22 @@ public class GeminiNPCTrait extends Trait {
         Material mat = playerStack.getType();
         if (mat == Material.AIR) return;     // nothing to take
 
-        // we only want to take one item; make a new stack of just that
-        ItemStack st = new ItemStack(mat, 1);
-
         // we can only give to player-type npcs. For others, the item will just disappear.
         if (npc.getEntity() instanceof Player npcp) {
-            // first we add to the NPC.
             Inventory inv = npcp.getInventory();
-            HashMap<Integer, ItemStack> leftover = inv.addItem(st);
-            if (!leftover.isEmpty()) {
+            p.getInventory().setItemInMainHand(null);   // remove from main hand
+            // add to NPC inventory getting leftovers
+            HashMap<Integer, ItemStack> leftover = inv.addItem(playerStack);
+            if (!leftover.isEmpty()) {  // handle leftovers.
                 // we couldn't add the item to the NPC. Send a message and give up.
-                respondTo(p, "(tries to give you " + st.getType().name() + " but you have no room)");
+                respondTo(p, "(tries to give you " + playerStack.getType().name() + " but you have no room)");
+                p.getWorld().dropItemNaturally(p.getLocation(),leftover.get(0));
                 return;
             }
         }
 
-        // we added the item to the NPC (or didn't need to), so we can remove it from the player.
-        // remove from player
-        int newAmount = playerStack.getAmount() - 1;
-        if (newAmount <= 0) {
-            p.getInventory().setItemInMainHand(null);
-        } else {
-            playerStack.setAmount(newAmount);
-        }
-
         // and send the message to the AI
-        respondTo(p, "(gives you " + st.getType().name() + ")");
+        respondTo(p, "(gives you " + playerStack.getType().name() + ")");
     }
 
     // this timer controls responses to purchases. When a purchase happens, it is set to a few seconds in the
@@ -401,7 +434,6 @@ public class GeminiNPCTrait extends Trait {
                     playerName==null?null:plugin.getServer().getPlayer(playerName),
                     action);
             Plugin.log("ACTION HANDLING: "+action);
-
         }
     }
 
@@ -524,6 +556,7 @@ public class GeminiNPCTrait extends Trait {
     void setPersona(String pname) {
         personaName = pname;
         chat = null; // a new chat will need to be made.
+        templateFunctions = null; // and so will a new template functions object
     }
 
     public record NearbyPlayer(Player p,   // player
@@ -682,11 +715,7 @@ public class GeminiNPCTrait extends Trait {
                 }
                 JsonObject output = new JsonObject();
 
-                // create a context builder if we don't have one
-                if(contextBuilder == null){
-                    contextBuilder = new ContextBuilder(this);
-                }
-                output.add("context", contextBuilder.getContext());
+                output.add("context", getContextBuilder().getContextDiffs());
                 output.add("input", new JsonPrimitive(input));
 
                 String outString = output.toString();
@@ -738,6 +767,23 @@ public class GeminiNPCTrait extends Trait {
         navTarget = waypoints.pathTo(this, name);
     }
 
+    public boolean isAtWaypointOrInRegion(String name) {
+        Location loc = npc.getStoredLocation();
+        name = name.trim();
+        Waypoints.NearWaypointResult n = waypoints.getNearWaypoint(loc, 100);
+        if(n==null) {
+            // do a region check instead
+            RegionManager rm = RegionManager.getManager(loc.getWorld());
+            Set<Region> regs = rm.getRegionSet(loc, false);
+            for(Region r: regs){
+                if(r.name.equalsIgnoreCase(name))return true;
+            }
+            return false;
+
+        };
+        return (n.waypoint().name.equalsIgnoreCase(name));
+    }
+
     /**
      * Destroy any existing chat session, forcing a reinitialise and complete local
      * memory loss!
@@ -747,7 +793,22 @@ public class GeminiNPCTrait extends Trait {
             // both of these are created on demand
             chat = null;
             contextBuilder = null;
+            templateFunctions = null;
         }
+    }
+
+    public TemplateFunctions getTemplateFunctions(){
+        if(templateFunctions==null){
+            templateFunctions = new TemplateFunctions(this);
+        }
+        return templateFunctions;
+    }
+
+    public ContextBuilder getContextBuilder(){
+        if(contextBuilder == null){
+            contextBuilder = new ContextBuilder(this);
+        }
+        return contextBuilder;
     }
 
     /**

@@ -1,28 +1,38 @@
 package org.pale.gemininpc.utils;
 
 import io.marioslab.basis.template.TemplateContext;
-import org.checkerframework.checker.units.qual.A;
 import org.pale.gemininpc.GeminiNPCTrait;
 import org.pale.gemininpc.Plugin;
 import org.pale.gemininpc.actions.Action;
 import org.pale.gemininpc.actions.ActionRegistry;
+import org.pale.gemininpc.ai.Persona;
 
 import java.util.*;
 
 /**
  * Useful functions for templates wrapped in a class.
- * This is created afresh every time we need to generate the system prompt for the NPC, which
- * happens the first time we talk to it.
+ * This is created when the NPC is created or reset, but the functions are added to the template context
+ * every time we need to template a string.
+ * Each NPC has their own, so we can keep NPC-private state here.
  */
 public class TemplateFunctions {
     GeminiNPCTrait trait = null;
     Random prng;
+    ;
+    // map of private values for this NPC accessed with the get/set functions.
+    public Map<String,Object> npcMap = new HashMap<>();
 
     public TemplateFunctions(GeminiNPCTrait trait) {
         this.trait = trait;
         // by default, the PRNG is seeded by the hashcode of the NPC name.
         // This can be overriden by "setseed" in a template, if you really don't like the name.
         prng = new Random(trait.seedString.hashCode());
+
+        // add initial values to npc map (well, really just replace with dupe).
+        Persona p = Plugin.getInstance().personae.get(trait.personaName);
+        if(p!=null){
+            npcMap = new HashMap<>(p.npcMapInitialValues);
+        }
     }
 
     // function that takes a List<Object> and returns a string
@@ -47,7 +57,7 @@ public class TemplateFunctions {
     }
 
     @FunctionalInterface
-    public interface StringStringFunction {
+    public interface StringToStringFunction {
         String apply(String arg);
     }
 
@@ -62,9 +72,15 @@ public class TemplateFunctions {
     }
 
     @FunctionalInterface
-    public interface StringObjectFunction {
+    public interface StringToObjectFunction {
         Object apply(String arg);
     }
+
+    @FunctionalInterface
+    public interface StringObjectToStringFunction {
+        String apply(String a1, Object a2);
+    }
+
 
     /**
      * Add functions to the template context. This is run every time the template is used!
@@ -76,10 +92,16 @@ public class TemplateFunctions {
         tc.set("pick", pickFunction);
         tc.set("random", randomFunction);
         tc.set("drop", dropFunction);   // replaces any value with nothing; useful for list.add() etc.
-        tc.set("mapset", addToMapFunction);  // set an item in a map, creating a new map if needed. Args: mapname,k,v
-        tc.set("map", getMapFunction); // get a map by name
+        tc.set("mapset", addToMapFunction);  // set an item in a GLOBAL map, creating a new map if needed. Args: mapname,k,v
+        tc.set("map", getMapFunction); // get a GLOBAL map by name
         tc.set("listadd", addToListFunction); // append an item to a list, creating a new list if needed. Args: listname,v
         tc.set("list", getListFunction); // get a list by name
+
+        tc.set("set", setNPCMapFunction); // (k,v) set an item in the NPC's private map
+        tc.set("get", getNPCMapFunction); // (v) get an value in the NPC's private map
+
+        tc.set("has", hasFunction); // (matname) returns true if this minecraft mat is in the inventory
+        tc.set("at", isAtFunction); // (name) returns true if the NPC is at the given waypoint it knows about or is in the given region
 
         // add actions for use in an "actions" dict. Argument is an "action group" name e.g. "default" or "sentinel",
         // and adds data to the "actions" map which you can then get with "map".
@@ -144,7 +166,7 @@ public class TemplateFunctions {
 
     private final IntIntToIntFunction randomFunction = (a, b) -> prng.nextInt(a, b);
 
-    private final StringStringFunction dropFunction = (a) -> "";
+    private final StringToStringFunction dropFunction = (a) -> "";
 
     Map<String, Map<String,String>> maps = new HashMap<>();
     Map<String, List<String>> lists = new HashMap<>();
@@ -154,7 +176,7 @@ public class TemplateFunctions {
         map.put(key,value);
         return "";
     };
-    private final StringObjectFunction getMapFunction = mapname -> maps.computeIfAbsent(mapname,k -> new HashMap<>());
+    private final StringToObjectFunction getMapFunction = mapname -> maps.computeIfAbsent(mapname, k -> new HashMap<>());
 
     private final StringStringToStringFunction addToListFunction = (listname, value) -> {
         List<String> lst = lists.computeIfAbsent(listname,k -> new ArrayList<>());
@@ -162,9 +184,9 @@ public class TemplateFunctions {
         return "";
     };
 
-    private final StringObjectFunction getListFunction = listname -> lists.computeIfAbsent(listname, k-> new ArrayList<>());
+    private final StringToObjectFunction getListFunction = listname -> lists.computeIfAbsent(listname, k-> new ArrayList<>());
 
-    private final StringStringFunction actionsFunction = (groupname) -> {
+    private final StringToStringFunction actionsFunction = (groupname) -> {
         Map<String, String> map = maps.computeIfAbsent("actions",k -> new HashMap<>());
         for(Map.Entry<String, ActionRegistry.Entry> e: trait.plugin.actionRegistry.getMap(groupname).entrySet() ){
             Plugin.getInstance().getLogger().info("  adding action "+e.getKey()+" from group "+groupname);
@@ -174,4 +196,17 @@ public class TemplateFunctions {
         }
         return "";
     };
+
+    private final StringObjectToStringFunction setNPCMapFunction = (String key, Object value) -> {
+        npcMap.put(key, value);
+        trait.plugin.getLogger().info("Setting NPC map "+key+"="+value);
+        return "";
+    };
+
+    private final StringToObjectFunction getNPCMapFunction = (String key)
+            -> npcMap.getOrDefault(key, "");
+
+    private final StringToObjectFunction hasFunction = (String matName) -> trait.has(matName);
+
+    private final StringToObjectFunction isAtFunction = (String wpname) -> trait.isAtWaypointOrInRegion(wpname);
 }

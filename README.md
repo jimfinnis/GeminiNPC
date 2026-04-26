@@ -133,12 +133,16 @@ The following template functions are available:
 * `pick(list, n, delimiter)` - randomly choose `n` items from the list and join them with the delimiter. The same item
 cannot be chosen multiple times. Sublists are permitted - see below.
 * `random(lower, upper)` - randomly choose an integer between lower (inclusive) and upper (exclusive)
-* `mapset(mapname, key, value)` - set a value inside a map, creating the map if not found
-* `map(mapname)` - return the map given the name, creating the map if not found; the map can then have the standard Java map methods called and can be iterated in a for-loop (see the Basis docs)
 * `listadd(listname, value)` - add a value to a list, creating the list if not found
 * `list(listname)` - return a list as a Java List object
 * `actions(group)` - adds the given actions group to the "actions" map (see Actions)
 * `drop(value)` - calculates the value but returns an empty string; occasionally useful because Basis will otherwise always render any returned value
+* `set(value,key)` - add a value to the NPC's private map of values
+* `get(key)` - get a value from the NPC's private map of values
+* `mapset(mapname, key, value)` - set a value inside a global map, creating the map if not found
+* `map(mapname)` - return the global map given the name, creating the map if not found; the map can then have the standard Java map methods called and can be iterated in a for-loop (see the Basis docs)
+* `has(name)` - return true if has the given Minecraft material or an item with this display or item name
+* `at(name)` - return true if we are very near the given NPC waypoint or within the given JCFUtils region
 
 Remember that this code only runs once, so if you want to change the template values, you'll need to reload the NPCs
 with `/gemini reload` or restart the server.
@@ -181,6 +185,19 @@ The "gender" of an NPC can be set in three ways:
 Setting the gender does only one thing - it sets the `gender` template value, which can then be used in the persona
 through the templating system. The value is just a string and can be anything you like, but the default is
 "non-binary".
+
+## Current state
+
+The main persona template is run once only, but some aspects of the NPCs personality
+(such as current thoughts, etc.) may change over time. This is expressed using the optional 
+"current-state" template string. It works exactly like a normal template string,
+but is transmitted with the AI request whenever it changes.
+
+### The private map
+Each NPC has a private map of data that the current state can select values from with
+`get` and `set`. The map starts empty by default, but can be initialised 
+from an `npc-map` object in a NPC YAML file.
+
    
 
 ## A templated YAML persona example

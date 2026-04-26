@@ -1,6 +1,7 @@
 
 package org.pale.gemininpc;
 
+import com.google.gson.JsonObject;
 import net.citizensnpcs.api.CitizensAPI;
 
 import java.io.IOException;
@@ -689,6 +690,21 @@ public class Plugin extends JavaPlugin implements Listener {
     public void prompt(CallInfo c){
         GeminiNPCTrait t = c.getCitizen();
         t.plugin.getLogger().info(t.getSystemInstructions());
+    }
+
+    @Cmd(desc="show NPC's context object on console", cz=true, argc=0)
+    public void context(CallInfo c){
+        GeminiNPCTrait t = c.getCitizen();
+        JsonObject o = t.getContextBuilder().getContext();
+        t.plugin.getLogger().info(o.toString());
+    }
+
+    @Cmd(desc="show private NPC map object on console", cz=true, argc=0)
+    public void map(CallInfo c){
+        GeminiNPCTrait t = c.getCitizen();
+        for(Map.Entry<String, Object> e: t.getTemplateFunctions().npcMap.entrySet()){
+            t.plugin.getLogger().info(e.getKey()+" = "+e.getValue().toString());
+        }
     }
 
     @SuppressWarnings("unused")
