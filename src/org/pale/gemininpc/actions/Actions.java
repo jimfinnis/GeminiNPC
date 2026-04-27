@@ -103,4 +103,15 @@ public class Actions {
         Plugin.log("Book written");
         ItemManipulation.giveItemToPlayerOrDrop(a.npc(),a.target(), book);
     }
+
+    @Action(usage="set KEY=VALUE",
+    desc="Set a value inside your private memory. Only do this when your current-state commands it")
+    public void set(ActionInfo a){
+        String args = a.args().trim();
+        String[] parts = args.split("=", 2);
+        String key = parts[0].trim();
+        String value = parts[1].trim();
+        Plugin.log("NPC "+a.npc().getName()+" setting private value "+key+" to "+value);
+        a.trait().getTemplateFunctions().npcMap.put(key,value);
+    }
 }

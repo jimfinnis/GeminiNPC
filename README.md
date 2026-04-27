@@ -137,8 +137,11 @@ cannot be chosen multiple times. Sublists are permitted - see below.
 * `list(listname)` - return a list as a Java List object
 * `actions(group)` - adds the given actions group to the "actions" map (see Actions)
 * `drop(value)` - calculates the value but returns an empty string; occasionally useful because Basis will otherwise always render any returned value
+
 * `set(value,key)` - add a value to the NPC's private map of values
 * `get(key)` - get a value from the NPC's private map of values
+* `setother(npcname,key,value)` - set a value inside another NPC's private map
+* `getother(npcname,key)` - get a value from  another NPC's private map
 * `mapset(mapname, key, value)` - set a value inside a global map, creating the map if not found
 * `map(mapname)` - return the global map given the name, creating the map if not found; the map can then have the standard Java map methods called and can be iterated in a for-loop (see the Basis docs)
 * `has(name)` - return true if has the given Minecraft material or an item with this display or item name
@@ -304,6 +307,7 @@ string the model should respond to, the former is a JSON-like string that looks 
     ]
   },
   "input": "jfinnis: (enters)"       # NOTE - this is a message sent automatically when a player arrives nearby
+  "current-state" : "normal" # or could be changed
 }
 ```
 It's worth noting that only parts of the context that have changed since the last turn are sent. So quite often
@@ -314,6 +318,8 @@ Most of what the context contains is obvious, but here are some notes:
 * `location` is a nearby waypoint name - GeminiNPC has its own waypoint system. NPCs are informed of their waypoints in the initial system instruction.
 * `location description` is a description of the waypoint.
 * `region` is information from the JCFUtils plugin's region mechanism - it gives the region name and description (if there is one).
+* `current-state` is set from the current state template as described above. It is calculated immediately before any request is sent to the AI.
+
 
 ## Waypoints
 

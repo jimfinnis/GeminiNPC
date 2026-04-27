@@ -1,6 +1,7 @@
 package org.pale.gemininpc.utils;
 
 import io.marioslab.basis.template.TemplateContext;
+import net.citizensnpcs.api.npc.NPC;
 import org.pale.gemininpc.GeminiNPCTrait;
 import org.pale.gemininpc.Plugin;
 import org.pale.gemininpc.actions.Action;
@@ -77,8 +78,19 @@ public class TemplateFunctions {
     }
 
     @FunctionalInterface
+    public interface StringStringToObjectFunction {
+        Object apply(String a1, String a2);
+    }
+
+
+    @FunctionalInterface
     public interface StringObjectToStringFunction {
         String apply(String a1, Object a2);
+    }
+
+    @FunctionalInterface
+    public interface StringStringObjectToStringFunction {
+        String apply(String a1, String a2, Object a3);
     }
 
 
@@ -97,8 +109,11 @@ public class TemplateFunctions {
         tc.set("listadd", addToListFunction); // append an item to a list, creating a new list if needed. Args: listname,v
         tc.set("list", getListFunction); // get a list by name
 
-        tc.set("set", setNPCMapFunction); // (k,v) set an item in the NPC's private map
-        tc.set("get", getNPCMapFunction); // (v) get an value in the NPC's private map
+        tc.set("set", setNPCMapFunction); // (k,v) set a value in this NPC's private map
+        tc.set("get", getNPCMapFunction); // (v) get a value in this NPC's private map
+
+        tc.set("setother", setOtherNPCMapFunction); // (npcname, k, v) set a value in another NPC's private map
+        tc.set("getother", getOtherNPCMapFunction); // (npcname, k) get a value from another NPC's private map
 
         tc.set("has", hasFunction); // (matname) returns true if this minecraft mat is in the inventory
         tc.set("at", isAtFunction); // (name) returns true if the NPC is at the given waypoint it knows about or is in the given region
@@ -205,6 +220,25 @@ public class TemplateFunctions {
 
     private final StringToObjectFunction getNPCMapFunction = (String key)
             -> npcMap.getOrDefault(key, "");
+
+    private final StringStringObjectToStringFunction setOtherNPCMapFunction = (String npcName, String k, Object v) -> {
+        NPC npc = Plugin.getInstance().getChatNPCByName(npcName);
+        if(npc != null){
+            GeminiNPCTrait trait = Plugin.getTraitFor(npc);
+            trait.getTemplateFunctions().npcMap.put(k,v);
+            trait.plugin.getLogger().info("Setting "+npcName+"'s map "+k+"="+v);
+        }
+        return "";
+    };
+
+    private final StringStringToObjectFunction getOtherNPCMapFunction = (String npcName, String k) -> {
+        NPC npc = Plugin.getInstance().getChatNPCByName(npcName);
+        if(npc != null){
+            GeminiNPCTrait trait = Plugin.getTraitFor(npc);
+            return trait.getTemplateFunctions().npcMap.get(k);
+        }
+        return "";
+    };
 
     private final StringToObjectFunction hasFunction = (String matName) -> trait.has(matName);
 

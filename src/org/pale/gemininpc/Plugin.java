@@ -402,7 +402,19 @@ public class Plugin extends JavaPlugin implements Listener {
             return npc.getOrAddTrait(GeminiNPCTrait.class);
         }
         return null;
+    }
 
+    /**
+     * Ugly method for getting an NPC by name; will just return the first one that matches.
+     * @param name
+     * @return first NPC with that name or null
+     */
+    public NPC getChatNPCByName(String name) {
+        for(var npc: chatters){
+            if(npc.getName().equalsIgnoreCase(name))
+                return npc;
+        }
+        return null;
     }
 
 
