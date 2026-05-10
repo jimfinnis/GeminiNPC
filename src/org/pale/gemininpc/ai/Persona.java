@@ -168,7 +168,6 @@ public class Persona {
         Template pt = tl.load("temp");
 
         String processed = pt.render(tc);
-        logger.severe("Processed: "+processed);
         // now maybe replace newlines, because we need the persona to be JSONable (probably).
         if(Plugin.getInstance().removeNewlinesFromPersona)
             processed = processed.replaceAll("\\n"," ");
@@ -211,6 +210,8 @@ public class Persona {
         String persona = generateString(tc, string);
         // then set it back into the template context as "persona"
         tc.set("persona", persona);
+
+        logger.info("Persona for "+t.getNPC().getName()+" from template "+t.personaName+": "+persona);
 
         // load and render the common template, which will include the persona
         Template template = tl.load("common"); // ffs - clunky that we have to do the set/load like this
