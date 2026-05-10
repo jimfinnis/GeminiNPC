@@ -29,18 +29,19 @@
     "text": "less than 200 words"
   },
 
+{{actions("default")}}
+
+
 {{if isSentinel}}
-    {{mapset("actions","setguard PLAYER","Start guarding the specified player.")}}
-    {{mapset("actions","unguard","Stop guarding the current player.")}}
+ {{actions("sentinel")}}
+{{end}}
+{{if hasWaypoints}}
+ {{actions("waypoints")}}
 {{end}}
 
   "actions": {
-    "give ITEM": "Give an item to a player. ITEM must be a Minecraft material.",
 {{for k,v in map("actions")}}
     "{{k}}" : "{{v}}",
-{{end}}
-{{if hasWaypoints}}
-    "go WAYPOINT" : "Go to a known waypoint"
 {{end}}
   },
 

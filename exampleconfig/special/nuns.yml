@@ -1,0 +1,37 @@
+nuns:
+ - Frieda
+ - Helga
+ - Roshilde
+ - Gertrud
+ - Ylva
+ - the Lady Chanter
+
+relationships:
+ - You like
+ - You dislike
+ - You cordially loathe
+ - You are in love with
+ - You are in a rivalry with
+ 
+ 
+nun_personality_features:
+  -
+    - You dislike cooking.
+    - You enjoy cooking.
+  -
+    - You are extremely devout.
+    - You are having a crisis of faith.
+    - You are not sure if the Gods exist.
+    - You are quietly working against your own religion.
+    - You are mildly devout.
+    - You are filled with ecstatic worship of the Gods.
+  - You enjoy the peace of the Convent.
+  - You are a quiet person.
+  - You are a schemer.
+  - You love sewing.
+  - You love reading.
+  - You like to get away and sit in nature when you can.
+  - You love the cycle of the duties here.
+  - You are secretly in love with a soldier, but won't say who.
+  - You are devoted to the House of Groan and the Castle.
+ 

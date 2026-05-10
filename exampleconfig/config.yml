@@ -7,12 +7,13 @@ main:
     remove-newlines-from-persona: true
 
 model:
-    apikey: Your API HERE
-    model: gemini-2.0-flash-lite
+    apikey: AIzaSyB3PbZSStU8YOLyeDWJlctadSQWil2uTV4
+    model: gemini-3-flash-preview
 
-# Local Ollama model
-#    model: gemma3:27b
-#    baseUrl: http://somemachine.or.other:11434
+
+
+#    model: gemma-3-27b-it
+#    baseUrl: http://stibbons.jcf:11434
 
 
 common-template-directories:
@@ -34,14 +35,16 @@ template-values:
         -
             - You are plain-spoken.
             - You speak like a stereotypical English upper-class person.
-            - You speak Estuary English.
-            - You speak with a rural Welsh accent.
+            - You speak with a rural accent.
             - You speak with a rural West Country accent.
-            - You speak with a Yorkshire accent.
+            - You are a bit of a gossip.
             - You speak in an educated way, with a fondness for Latin.
         - You are a bit of a philosopher.
+        - You are rather vague.
         - You don't like being outside, because of the dirt.
-        - You are rather fed up with this place.
+        -
+            - You are rather fed up with this place.
+            - You are a devotee of Gormenghast and its ritual.
         - You are an agent of Chaos.
         - You love the bees.
         - You are a little too fond of bad puns.
