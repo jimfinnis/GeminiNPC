@@ -130,6 +130,7 @@ More templates values can be set in two ways:
 
 The following template functions are available:
 * `choose(list)` - randomly choose one of the items in the list. Sublists are permitted - see below.
+* `exclude(list,string)` returns a new list with any strings containing `s` removed. Useful in constructions like `choose(exclude(somelist,name))` to remove the NPC itself from lists.
 * `pick(list, n, delimiter)` - randomly choose `n` items from the list and join them with the delimiter. The same item
 cannot be chosen multiple times. Sublists are permitted - see below.
 * `random(lower, upper)` - randomly choose an integer between lower (inclusive) and upper (exclusive)

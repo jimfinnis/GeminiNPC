@@ -9,6 +9,7 @@ import org.pale.gemininpc.actions.ActionRegistry;
 import org.pale.gemininpc.ai.Persona;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Useful functions for templates wrapped in a class.
@@ -93,6 +94,11 @@ public class TemplateFunctions {
         String apply(String a1, String a2, Object a3);
     }
 
+    @FunctionalInterface
+    public interface ListStringListFunction {
+        List<Object> apply(List<Object> a1, String a2);
+    }
+
 
     /**
      * Add functions to the template context. This is run every time the template is used!
@@ -102,6 +108,7 @@ public class TemplateFunctions {
 
         tc.set("choose", stringChooseFunction);
         tc.set("pick", pickFunction);
+        tc.set("exclude", excludeFunction); // return a new list of items in a list which do not contain a string
         tc.set("random", randomFunction);
         tc.set("drop", dropFunction);   // replaces any value with nothing; useful for list.add() etc.
         tc.set("mapset", addToMapFunction);  // set an item in a GLOBAL map, creating a new map if needed. Args: mapname,k,v
@@ -153,6 +160,12 @@ public class TemplateFunctions {
     private final ListStringFunction stringChooseFunction = (args) -> {
         return chooseItem(args, false); // no need to remove, this is a single choice.
     };
+
+    private final ListStringListFunction excludeFunction = (List<Object> listIn, String toExclude) ->
+            listIn.stream().filter(x -> !x.toString().contains(toExclude)).toList();
+
+
+
 
     /**
      * Given a list, a count and a delimiter string, pick that many random elements from the list.
