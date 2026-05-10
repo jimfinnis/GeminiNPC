@@ -1,2 +1,4 @@
 string: |
     {{pick(random_personality_features,3,"\n")}}
+    Do not give gifts.
+
