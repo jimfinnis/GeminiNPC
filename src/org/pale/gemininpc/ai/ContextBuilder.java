@@ -131,11 +131,11 @@ public class ContextBuilder {
 
         // light conditions?
         if (totalLight > 0) {
-            root.addProperty("light from the sun", String.format("%d/15", skyLight));
+            root.addProperty("light from the sky", String.format("%d/15", skyLight));
             root.addProperty("light from lamps", String.format("%d/15", blockLight));
 
         } else {
-            root.addProperty("light from the sun", "none");
+            root.addProperty("light from the sky", "none");
             root.addProperty("light from lamps", "none");
         }
 

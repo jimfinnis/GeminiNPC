@@ -30,7 +30,7 @@ public class Actions {
         }
     }
 
-    @Action(usage="setguard PLAYER", desc="Start guarding the specified player.", group="sentinel")
+    @Action(usage="setguard PLAYER", desc="Start guarding the specified player. Do this only when a player requests it or is under attack.", group="sentinel")
     public void setguard(ActionInfo a){
         if(a.trait().isSentinel()){
             Sentinel s = plugin.sentinelPlugin;

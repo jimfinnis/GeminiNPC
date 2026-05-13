@@ -7,7 +7,7 @@ main:
     remove-newlines-from-persona: true
 
 model:
-    apikey: AIzaSyB3PbZSStU8YOLyeDWJlctadSQWil2uTV4
+    apikey: Put your key here
     model: gemini-3-flash-preview
 
 
