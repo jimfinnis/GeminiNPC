@@ -29,7 +29,7 @@ import static org.pale.gemininpc.utils.Json.getDifferences;
  * has changed since the last request is sent.
  */
 public class ContextBuilder {
-    private GeminiNPCTrait trait;
+    private final GeminiNPCTrait trait;
     private final NPC npc;
     private final Plugin plugin;
 
@@ -47,7 +47,7 @@ public class ContextBuilder {
 
     public JsonObject getContext() {
         Location loc = npc.getStoredLocation();
-        World w = loc.getWorld();
+        World w = Objects.requireNonNull(loc.getWorld());
 
         Block blk = loc.getBlock();
 
@@ -61,7 +61,7 @@ public class ContextBuilder {
             root.addProperty("time", plugin.getText("no-skylight-time"));
             root.addProperty("weather", plugin.getText("no-skylight-weather"));
         } else {
-            long t = Objects.requireNonNull(w).getTime();
+            long t = w.getTime();
             int hours = (int) ((t / 1000 + 6) % 24);
             int minutes = (int) (60 * (t % 1000) / 1000);
             String timeString = String.format("%02d:%02d", hours, minutes);
