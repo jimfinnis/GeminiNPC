@@ -9,31 +9,34 @@ What remains on `feature/quests`. The example quest is
   values and evaluator, with tests in `test/org/pale/gemininpc/quests/expr`.
 - At load time, `when:` conditions are parsed and each identifier is checked against the
   quest's `facts`.
-- Loading of `id`, `title`, `requires`, `facts` (in part) and `participants`.
+- Loading of `id`, `title`, `scope`, `requires`, `facts` (in part), `triggers` and
+  `participants`.
 - A trigger framework (`Trigger`, `ITriggerCondition`, `ITriggerAction`, `TriggerEvent`) with
-  one condition, `give`, and one action, `set`. The `set` action does nothing yet.
+  one condition, `give`, and one action, `set`, which sets a fact in the quest's `Instance`.
 
 ## The loader doesn't match the example file
 
 Fix these first. As things stand they make the loader silently ignore parts of the quest, or
 throw.
 
-- [ ] **Triggers are ignored.** `triggers:` is a YAML list, but `Quest.loadTriggers` reads it
+- [x] **Triggers are ignored.** `triggers:` is a YAML list, but `Quest.loadTriggers` reads it
       with `getConfigurationSection`, which returns null for a list. Use `getMapList` instead,
       as `loadNPCData` does.
 - [ ] **Rumours are ignored.** The file puts `spreads-to:` and `rumour:` directly under the
       fact. `Fact` expects `rumours: { name: { spreads-to, text } }`. Pick one format.
-- [ ] **`scope: player` is ignored.** `Quest` reads a boolean `player_only` instead. Read
+- [x] **`scope: player` is ignored.** `Quest` reads a boolean `player_only` instead. Read
       `scope` as `player` or `world`, and reject any other value.
-- [ ] **`give "ominous banner" to ladychanter` will throw.** An ominous banner isn't a
+- [x] **`give "ominous banner" to ladychanter` will throw.** An ominous banner isn't a
       `Material`; it's a white banner with a particular pattern. Either match on the item's
       display name, lore or other item data, or document that `give` takes only a plain
       material name.
+  - [ ] Test in game that the ominous banner matches. Its name is a translatable item-name
+        component, and `getItemName()` may not return plain "Ominous Banner".
 - [ ] **`read-book` isn't a trigger condition yet.** Add it, along with a `TriggerEvent` record
       and a listener hook. It probably needs `PlayerEditBookEvent`, or a check on opening a
       book, since there's no direct "read" event.
-- [ ] **Facts named in `set:` aren't checked.** Check every fact named by a trigger's or an
-      action's `set:` against `facts` at load time, as `when:` identifiers already are.
+- [ ] **Facts named in `set:` aren't checked.** Done for triggers; still to do for NPC
+      actions' `set:`, against `facts` at load time, as `when:` identifiers already are.
 - [ ] **Validate the rest of the file at load time:**
   - every `objectives[].done` and `complete-when` should parse as an expression against the
     facts;
@@ -48,8 +51,9 @@ throw.
 - [ ] **Decide what happens when a quest file is bad.** One broken quest file should log a
       clear error naming the file and the problem, not stop the plugin from loading. Parse
       errors already have good messages; add the file name and the condition text.
-- [ ] **Quest state:**
-  - a fact-value map per quest, kept per player for `scope: player` and once for `scope: world`;
+- [ ] **Quest state.** Started: `Instance` holds a fact-value map, and `Quest.start` /
+      `getInstance` keep one per player UUID for `scope: player` and one for `scope: world`.
+      Still to do:
   - which quests each player has started or completed, and which are active, so that
     `requires` and `start:` can work;
   - how a quest starts in the first place: automatically when everything it requires is
@@ -69,9 +73,10 @@ throw.
 - [ ] **Rumours.** When a fact with rumours becomes true, add each rumour's text to the context
       of the NPCs in `spreads-to`. The names there can be single NPCs or groups such as `[nuns]`,
       so a group needs defining somewhere, perhaps in the persona or in config.
-- [ ] **Firing triggers.**
-  - `SetAction.run()` needs the quest state, so the action needs the event, at least
-    `player()`, or a context object.
+- [ ] **Firing triggers.** `Trigger.check(player, event)` finds the instance and runs the
+      actions on it. Still to do:
+  - `Trigger.check` is package-private, so add a public entry point (on `Quest` or a quest
+    manager) that checks an event against every loaded quest's triggers.
   - Call `Trigger.check` from `ChatEventListener` on the matching Bukkit events, for example
     NPC right-click gives for `give`.
 - [ ] **Commands for debugging**, e.g. `/gemini quest list`, `/gemini quest state PLAYER`,

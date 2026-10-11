@@ -1,5 +1,8 @@
 package org.pale.gemininpc.quests.triggers;
 
+import org.pale.gemininpc.quests.Instance;
+import org.pale.gemininpc.quests.expr.Value;
+
 public class SetAction implements ITriggerAction {
     String factName;
     public SetAction(String astr) {
@@ -7,7 +10,7 @@ public class SetAction implements ITriggerAction {
     }
 
     @Override
-    public void run() {
-
+    public void run(Instance inst) {
+        inst.set(factName, Value.TRUE);
     }
 }

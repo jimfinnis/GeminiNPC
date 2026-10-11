@@ -1,6 +1,7 @@
 package org.pale.gemininpc.quests;
 
 import org.bukkit.configuration.ConfigurationSection;
+import org.pale.gemininpc.quests.expr.Value;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -12,7 +13,7 @@ import java.util.Set;
  *
  * Note that this doesn't hold the fact's actual value - that's part of the quest state.
  */
-class Fact {
+public class Fact {
     record Rumour (
             Set<String> npcNames, // NPCs to whom this particular rumour spreads
             String text         // the text that gets adding to those NPC prompts when the rumour is true
@@ -37,5 +38,13 @@ class Fact {
                 throw new RuntimeException("No text in rumour "+name+" in fact "+cs.getName());
             rumours.add(new Rumour(new HashSet<>(r.getStringList("spreads-to")), text));
         }
+    }
+
+    /**
+     * Create the initial value for this fact. At the moment this just assumes booleans which are false.
+     * We *may* expand this later.
+     */
+    Value createInstance(){
+        return Value.FALSE;
     }
 }

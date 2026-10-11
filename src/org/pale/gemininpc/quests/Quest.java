@@ -1,7 +1,9 @@
 package org.pale.gemininpc.quests;
 
 import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.MemoryConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
+import org.bukkit.entity.Player;
 import org.pale.gemininpc.Plugin;
 import org.pale.gemininpc.quests.triggers.Trigger;
 
@@ -9,7 +11,7 @@ import java.nio.file.Path;
 import java.util.*;
 
 public class Quest {
-    String id;  // quest name
+    public String id;  // quest name
     String title; // quest title
 
     /**
@@ -41,6 +43,12 @@ public class Quest {
      */
     Map<String, NPCQuestData> npcData = new HashMap<>();
 
+    /**
+     * Instances of the quest actually running, keyed by player UUID. If there is only one global instance
+     * it is keyed under null.
+     */
+    Map<UUID, Instance> instances = new HashMap<>();
+
 
     /**
      * Load the quest
@@ -55,13 +63,21 @@ public class Quest {
         title = root.getString("title");
         if(title==null)
             throw new RuntimeException("No title in quest file "+path);
-        player_only = root.getBoolean("player_only", true);
+        String scope = root.getString("scope");
+        if(scope==null)
+            throw new RuntimeException("No scope in quest file "+path);
+        if(scope.equals("player"))
+            player_only = true;
+        else if(scope.equals("world"))
+            player_only = false;
+        else
+            throw new RuntimeException("Bad scope \""+scope+"\" in quest file "+path+", should be player or world");
 
         List<String> requireslist= root.getStringList("requires"); // should default to empty list
-        requires = new HashSet<String>(requireslist);
+        requires = new HashSet<String>(requireslist);   // Ignored at the moment TODO
 
         loadFacts(root.getConfigurationSection("facts"));
-        loadTriggers(root.getConfigurationSection("triggers"));
+        loadTriggers(root.getMapList("triggers"));
         loadNPCData(root.getConfigurationSection("participants"));
     }
 
@@ -74,13 +90,14 @@ public class Quest {
 
     }
 
-    private void loadTriggers(ConfigurationSection r){
-        if(r==null)return;
-        for(String name: r.getKeys(false)){
-            Trigger t = new Trigger(r.getConfigurationSection(name));
+    // triggers are a list of maps.
+    private void loadTriggers(List<Map<?,?>> maps){
+        if(maps==null)return;
+        for(var map: maps){
+            ConfigurationSection cs = new MemoryConfiguration().createSection("r",map);
+            Trigger t = new Trigger(this, cs);
             triggers.add(t);
         }
-
     }
     private void loadNPCData(ConfigurationSection r){
         if(r==null)return;
@@ -90,6 +107,33 @@ public class Quest {
             NPCQuestData t = new NPCQuestData(this, r.getMapList(npc));
             npcData.put(npc, t);
         }
+    }
 
+    ///  Start the quest for a given player. If this is a world quest, we create it with a null
+    /// player key instead of that passed in!
+    Instance start(Player p){
+        UUID key = instanceKey(p);
+        if(instances.containsKey(key))
+            throw new RuntimeException(String.format("Cannot have more than one instance of quest %s for %s ",
+                    id,(key==null) ? "the world" : ("player "+p.getName())
+                    ));
+        var instance = new Instance(this, key);
+        instances.put(key, instance);
+        return instance;
+    }
+
+    /// Return an instance of the quest, or the instance keyed to null for world quests.
+    public Instance getInstance(Player p){
+        return instances.get(instanceKey(p));
+    }
+
+    /// The key for a player's instance: their UUID, which (unlike the `Player` object) stays the same
+    /// when they log out and back in. World quests have one instance, keyed under null.
+    private UUID instanceKey(Player p){
+        return player_only ? p.getUniqueId() : null;
+    }
+
+    public Fact getFact(String s){
+        return facts.get(s);
     }
 }
