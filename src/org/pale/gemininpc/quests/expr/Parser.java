@@ -3,7 +3,7 @@ package org.pale.gemininpc.quests.expr;
 import java.util.*;
 
 public class Parser {
-    class Exception extends RuntimeException {
+    static class Exception extends RuntimeException {
         public Exception(String message) {
             super(message);
         }

@@ -13,7 +13,7 @@ abstract class PrefixParselet {
                     if(p.variables.contains(id.s))
                         yield new Value.Ident(id.s);
                     else
-                        throw new IllegalArgumentException("Unknown variable: "+id.s);
+                        throw new Parser.Exception("unknown identifier " + id.s);
                 }
                 case Token.OperatorToken o -> throw new IllegalArgumentException("not a value token: " + o);
             };

@@ -3,11 +3,23 @@ package org.pale.gemininpc.quests.expr;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 // These go through the parser as well, so they check the whole string-to-value path. The operators
 // themselves are tested in detail in ValueTest; this is about the evaluator walking the tree.
 public class EvaluatorTest {
+    // The parser rejects identifiers it hasn't been told about, so every name these tests use is
+    // registered. The evaluator is only given values for some of them, so names like "nosuchthing"
+    // get past the parser and test the evaluator's own unknown-identifier check.
+    private static TreeNode parse(String input) {
+        Parser p = new Parser();
+        p.registerVariables(List.of("gold", "level", "name", "faction", "rebels", "empire",
+                "silver", "foo", "nosuchthing"));
+        return p.parse(input);
+    }
+
     private static Value eval(String input) {
-        return new Evaluator().evaluate(new Parser().parse(input));
+        return new Evaluator().evaluate(parse(input));
     }
 
     private static void check(String input, Value expected) {
@@ -38,7 +50,7 @@ public class EvaluatorTest {
     }
 
     private static void checkWith(Evaluator e, String input, Value expected) {
-        Assertions.assertEquals(expected, e.evaluate(new Parser().parse(input)), "Input: " + input);
+        Assertions.assertEquals(expected, e.evaluate(parse(input)), "Input: " + input);
     }
 
     @Test
@@ -76,7 +88,7 @@ public class EvaluatorTest {
     public void unknownIdentifier() {
         Evaluator e = withValues();
         RuntimeException ex = Assertions.assertThrows(RuntimeException.class,
-                () -> e.evaluate(new Parser().parse("gold + silver")));
+                () -> e.evaluate(parse("gold + silver")));
         Assertions.assertEquals("unknown identifier silver", ex.getMessage());
         // an evaluator with nothing set knows no identifiers at all
         Assertions.assertThrows(RuntimeException.class, () -> eval("foo"));
@@ -129,9 +141,9 @@ public class EvaluatorTest {
         Assertions.assertThrows(RuntimeException.class, () -> eval("-'a'"));
         Assertions.assertThrows(RuntimeException.class, () -> eval("not 'a'"));
         Evaluator e = withValues();
-        Assertions.assertThrows(RuntimeException.class, () -> e.evaluate(new Parser().parse("-name")));
-        Assertions.assertThrows(RuntimeException.class, () -> e.evaluate(new Parser().parse("not faction")));
-        Assertions.assertThrows(RuntimeException.class, () -> e.evaluate(new Parser().parse("-nosuchthing")));
+        Assertions.assertThrows(RuntimeException.class, () -> e.evaluate(parse("-name")));
+        Assertions.assertThrows(RuntimeException.class, () -> e.evaluate(parse("not faction")));
+        Assertions.assertThrows(RuntimeException.class, () -> e.evaluate(parse("-nosuchthing")));
     }
 
     @Test
@@ -167,8 +179,8 @@ public class EvaluatorTest {
     @Test
     public void lookedUpValuesAreTypeChecked() {
         Evaluator e = withValues();
-        Assertions.assertThrows(RuntimeException.class, () -> e.evaluate(new Parser().parse("gold + name")));
-        Assertions.assertThrows(RuntimeException.class, () -> e.evaluate(new Parser().parse("faction == 'rebels'")));
+        Assertions.assertThrows(RuntimeException.class, () -> e.evaluate(parse("gold + name")));
+        Assertions.assertThrows(RuntimeException.class, () -> e.evaluate(parse("faction == 'rebels'")));
     }
 
     @Test

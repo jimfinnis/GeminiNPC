@@ -3,6 +3,8 @@ package org.pale.gemininpc.quests.expr;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+import java.util.List;
+
 public class ParserTest {
     // Flatten a tree into a Lisp-style string so a whole tree can be checked in one assertion:
     // numbers and identifiers are written as-is, strings are in double quotes, and a binary
@@ -21,36 +23,43 @@ public class ParserTest {
         };
     }
 
+    // A parser that knows every identifier these tests use; any other name is a parse error.
+    private static Parser parser() {
+        Parser p = new Parser();
+        p.registerVariables(List.of("a", "b", "c", "d", "foo", "name"));
+        return p;
+    }
+
     // Assert a node is a ValueNode and return the Value it holds.
     private static Value valueOf(TreeNode n) {
         return Assertions.assertInstanceOf(TreeNode.ValueNode.class, n).value;
     }
 
     private static void check(String input, String expected) {
-        Assertions.assertEquals(expected, sexpr(new Parser().parse(input)), "Input: " + input);
+        Assertions.assertEquals(expected, sexpr(parser().parse(input)), "Input: " + input);
     }
 
     @Test
     public void emptyString() {
-        Parser p = new Parser();
+        Parser p = parser();
         Assertions.assertThrows(Parser.Exception.class, () -> p.parse(""));
         Assertions.assertThrows(Parser.Exception.class, () -> p.parse("   "));
     }
 
     @Test
     public void justNumber() {
-        Assertions.assertEquals(new Value.Int(6), valueOf(new Parser().parse("6")));
+        Assertions.assertEquals(new Value.Int(6), valueOf(parser().parse("6")));
     }
 
     @Test
     public void justIdentifier() {
-        Assertions.assertEquals(new Value.Ident("foo"), valueOf(new Parser().parse("foo")));
+        Assertions.assertEquals(new Value.Ident("foo"), valueOf(parser().parse("foo")));
     }
 
     @Test
     public void justString() {
         // strings get their own kind of value, distinct from identifiers
-        Value v = valueOf(new Parser().parse("\"foo\""));
+        Value v = valueOf(parser().parse("\"foo\""));
         Assertions.assertEquals(new Value.Str("foo"), v);
         Assertions.assertNotEquals(new Value.Ident("foo"), v);
         check("name + 'bar'", "(+ name \"bar\")");
@@ -59,7 +68,7 @@ public class ParserTest {
     @Test
     public void sum() {
         // check the node structure directly once, the rest of the tests use sexpr()
-        TreeNode tn = new Parser().parse("6+foo");
+        TreeNode tn = parser().parse("6+foo");
         TreeNode.BinopNode b = Assertions.assertInstanceOf(TreeNode.BinopNode.class, tn);
         Assertions.assertEquals("+", b.op);
         Assertions.assertEquals(new Value.Int(6), valueOf(b.left));
@@ -154,7 +163,7 @@ public class ParserTest {
 
     @Test
     public void bracketErrors() {
-        Parser p = new Parser();
+        Parser p = parser();
         Assertions.assertThrows(Parser.Exception.class, () -> p.parse("("));
         Assertions.assertThrows(Parser.Exception.class, () -> p.parse("(a"));
         Assertions.assertThrows(Parser.Exception.class, () -> p.parse("(a + b"));
@@ -169,7 +178,7 @@ public class ParserTest {
 
     // Assert parsing fails with exactly this message
     private static void errorMessage(String input, String expected) {
-        Parser.Exception e = Assertions.assertThrows(Parser.Exception.class, () -> new Parser().parse(input),
+        Parser.Exception e = Assertions.assertThrows(Parser.Exception.class, () -> parser().parse(input),
                 "Input: " + input);
         Assertions.assertEquals(expected, e.getMessage(), "Input: " + input);
     }
@@ -190,6 +199,27 @@ public class ParserTest {
         errorMessage("* 2", "expected a value but found *");
         errorMessage("a)", "unexpected ) after end of expression");
         errorMessage("6 6", "unexpected 6 after end of expression");
+    }
+
+    @Test
+    public void unregisteredIdentifiers() {
+        errorMessage("bar", "unknown identifier bar");
+        errorMessage("a + bar * 2", "unknown identifier bar");
+        errorMessage("not (bar)", "unknown identifier bar");
+        // caught at parse time, so short-circuiting at evaluation time can't hide it
+        errorMessage("0 and bar", "unknown identifier bar");
+        // names are case-sensitive
+        errorMessage("A", "unknown identifier A");
+        // strings aren't identifiers, so they don't need registering
+        check("'bar'", "\"bar\"");
+        // nothing is registered by default
+        Assertions.assertThrows(Parser.Exception.class, () -> new Parser().parse("a"));
+        Assertions.assertEquals(new Value.Int(6), valueOf(new Parser().parse("6")));
+        // registering adds to the names already there
+        Parser p = new Parser();
+        p.registerVariables(List.of("x"));
+        p.registerVariables(List.of("y"));
+        Assertions.assertEquals("(+ x y)", sexpr(p.parse("x + y")));
     }
 
     @Test
@@ -222,14 +252,14 @@ public class ParserTest {
     @Test
     public void parserIsReusable() {
         // the same Parser should give independent results for successive parses
-        Parser p = new Parser();
+        Parser p = parser();
         Assertions.assertEquals("(+ 1 2)", sexpr(p.parse("1 + 2")));
         Assertions.assertEquals("(* a b)", sexpr(p.parse("a * b")));
     }
 
     @Test
     public void errors() {
-        Parser p = new Parser();
+        Parser p = parser();
         // operator with nothing after it
         Assertions.assertThrows(Parser.Exception.class, () -> p.parse("6 +"));
         // expression can't start with an operator, other than the unary ones (- and not)
