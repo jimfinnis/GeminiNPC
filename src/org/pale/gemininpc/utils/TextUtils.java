@@ -60,4 +60,41 @@ public class TextUtils {
         return chunks;
     }
 
+    /**
+     * Split a string on whitespace, but treat anything inside double quotes as part of a single
+     * word, so 'foo "bar baz" quux' gives [foo, bar baz, quux]. Quotes can appear mid-word
+     * (a"b c"d gives [ab cd]), and "" gives an empty string. A backslash includes the next character
+     * literally, so \" is a quote inside a word. An unterminated quote runs to the end of the string.
+     * Single quotes are not special, so apostrophes (don't) are left alone.
+     */
+    public static List<String> splitQuoted(String text) {
+        List<String> words = new ArrayList<>();
+        StringBuilder sb = new StringBuilder();
+        boolean inWord = false;     // true if we have started a word (even an empty quoted one)
+        boolean inQuotes = false;
+
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '\\' && i + 1 < text.length()) {
+                sb.append(text.charAt(++i));
+                inWord = true;
+            } else if (c == '"') {
+                inQuotes = !inQuotes;
+                inWord = true;
+            } else if (Character.isWhitespace(c) && !inQuotes) {
+                if (inWord) {
+                    words.add(sb.toString());
+                    sb.setLength(0);
+                    inWord = false;
+                }
+            } else {
+                sb.append(c);
+                inWord = true;
+            }
+        }
+        if (inWord)
+            words.add(sb.toString());
+        return words;
+    }
+
 }

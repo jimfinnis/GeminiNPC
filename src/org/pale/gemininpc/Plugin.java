@@ -33,6 +33,7 @@ import org.pale.gemininpc.ai.Model;
 import org.pale.gemininpc.ai.Persona;
 import org.pale.gemininpc.commands.*;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
+import org.pale.gemininpc.quests.Quest;
 import org.pale.gemininpc.waypoints.Waypoint;
 import org.pale.gemininpc.waypoints.Waypoints;
 
@@ -222,11 +223,13 @@ public class Plugin extends JavaPlugin implements Listener {
         List<String> dirlist = cs.getStringList(dirListName);
         for(String s: dirlist){
             Path p = Paths.get(s);
+            if(p.toString().endsWith("~"))  // skip MicroEmacs backup files!
+                continue;
             if(!p.isAbsolute()){
                 p = Paths.get(getServer().getWorldContainer().getAbsolutePath(),s);
             }
             if(!p.toFile().exists()){
-                warn(dirListName+" directory "+s+" does not exist");
+                warn(dirListName+" directory "+p+" does not exist");
             } else {
                 log(dirListName+" directory: "+p);
             }
@@ -311,6 +314,13 @@ public class Plugin extends JavaPlugin implements Listener {
                 (name, path) -> {
                     Persona p = new Persona(name, path);
                     personae.put(p.name, p);
+                });
+
+        // pull in the quests
+        Plugin.log("Loading quests!");
+        processFilesInConfigDirectory(c, "quest-directories",
+                (name, path) -> {
+                    Quest q = new Quest(path);
                 });
 
         // finally pull in the common texts, which are in the "texts" section.
