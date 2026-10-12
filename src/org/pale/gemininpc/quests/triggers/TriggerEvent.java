@@ -21,7 +21,8 @@ public interface TriggerEvent {
 
     /**
      * A player has read a book
-     * @param displayName - the book's display name (not title); you can set with /jcf dname
+     * @param displayName - the book's display name, which you can set with /jcf dname; null if it has none
+     * @param title - the title given when a written book was signed; null for an unsigned book and quill
      */
-    record ReadBook(String displayName) implements TriggerEvent {}
+    record ReadBook(String displayName, String title) implements TriggerEvent {}
 }

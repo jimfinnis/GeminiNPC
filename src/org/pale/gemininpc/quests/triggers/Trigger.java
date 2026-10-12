@@ -67,7 +67,7 @@ public class Trigger {
             case "read-book" -> {
                 if(ss.size()!=2)
                     throw new QuestException("on: bad read-book condition \"" + s
-                            + "\", should be: read-book BOOK_DISPLAY_NAME");
+                            + "\", should be: read-book NAME_OR_TITLE");
                 return new ReadBookCondition(ss.get(1));
             }
             default -> throw new QuestException("on: unknown condition type \"" + ss.getFirst()

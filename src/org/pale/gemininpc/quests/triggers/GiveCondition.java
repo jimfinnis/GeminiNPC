@@ -1,5 +1,6 @@
 package org.pale.gemininpc.quests.triggers;
 
+import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
@@ -32,10 +33,16 @@ public class GiveCondition implements ITriggerCondition {
         if(meta == null)
             return false;   // we have no metadata to compare further
 
-        // now we check against the display name and the item name.
-        if (meta.hasDisplayName() && meta.getDisplayName().equalsIgnoreCase(itemName))
+        // now we check against the display name and the item name, ignoring colour codes
+        if (meta.hasDisplayName() && namesMatch(meta.getDisplayName()))
             return true;
-        else return meta.hasItemName() && meta.getItemName().equalsIgnoreCase(itemName);
+        else return meta.hasItemName() && namesMatch(meta.getItemName());
+    }
+
+    /// Compare a name from an item with the one in the quest, ignoring case and colour codes, so that a
+    /// name set with e.g. `/jcf dname &6Ominous Banner` still matches "ominous banner".
+    private boolean namesMatch(String name) {
+        return ChatColor.stripColor(itemName).equalsIgnoreCase(ChatColor.stripColor(name));
     }
 
     @Override

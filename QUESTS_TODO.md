@@ -22,31 +22,37 @@ throw.
 - [x] **Triggers are ignored.** `triggers:` is a YAML list, but `Quest.loadTriggers` reads it
       with `getConfigurationSection`, which returns null for a list. Use `getMapList` instead,
       as `loadNPCData` does.
-- [ ] **Rumours are ignored.** The file puts `spreads-to:` and `rumour:` directly under the
-      fact. `Fact` expects `rumours: { name: { spreads-to, text } }`. Pick one format.
+- [x] **Rumours are ignored.** The example file now uses the format `Fact` expects:
+      `rumours: { name: { spreads-to, text } }`.
 - [x] **`scope: player` is ignored.** `Quest` reads a boolean `player_only` instead. Read
       `scope` as `player` or `world`, and reject any other value.
 - [x] **`give "ominous banner" to ladychanter` will throw.** An ominous banner isn't a
       `Material`; it's a white banner with a particular pattern. Either match on the item's
       display name, lore or other item data, or document that `give` takes only a plain
       material name.
-  - [ ] Test in game that the ominous banner matches. Its name is a translatable item-name
-        component, and `getItemName()` may not return plain "Ominous Banner".
+  - [ ] Test in game that the ominous banner matches. The plan is to set its display name to
+        "Ominous Banner" (e.g. with `/jcf dname`), since the vanilla name is a translatable
+        component that `getItemName()` won't return as plain text. Matching the banner pattern
+        instead isn't worth the effort, but it does mean any item renamed in an anvil will match.
+  - [x] Colour codes in the display name (`/jcf dname &6Ominous Banner`) no longer stop it
+        matching: `GiveCondition` and `ReadBookCondition` strip them from both names.
 - [x] **`read-book` trigger condition.** `ReadBookCondition` (`read-book NAME`) matches a
-      `TriggerEvent.ReadBook` on the book's display name, ignoring case. `ChatEventListener`
+      `TriggerEvent.ReadBook` on the book's display name or title, ignoring case. `ChatEventListener`
       detects reading through `PlayerInteractEvent` (right-clicking a written book or book and
       quill in hand) and `InventoryOpenEvent` (opening a lectern), both of which call
       `bookRead`. Still to do:
   - [ ] Join them up: `bookRead` only logs; it should fire a `TriggerEvent.ReadBook` (see
         "Firing triggers" below).
-  - [ ] `ReadBookCondition.check` calls `name.equalsIgnoreCase(...)` on the event's name, so a
+  - [x] `ReadBookCondition.check` calls `name.equalsIgnoreCase(...)` on the event's name, so a
         book with no display name will throw if `bookRead` passes null. Swap the comparison
         round or pass `""`.
-  - [ ] Decide whether to strip colour codes from the display name before comparing, and whether
-        a written book's title should also match.
+  - [x] Colour codes are stripped from both names before comparing.
+  - [x] A written book's title also matches: `TriggerEvent.ReadBook` carries both the display
+        name and the title (null for a book and quill), and either can match. `bookRead` will
+        need to pass both when it's joined up.
   - [ ] Remove the debug code: the `snark` helper (unused), the logging in `bookRead`, and the
         unused imports (`Material`, `InventoryEvent`, `PlayerTakeLecternBookEvent`).
-  - [ ] The `read-book` parse error doesn't include the condition text; the `give` one does.
+  - [x] The `read-book` parse error doesn't include the condition text; the `give` one does.
   - [ ] Test in game: books in either hand, sneak-clicking a block while holding a book, and
         lecterns. `PlayerInteractEvent` fires once per hand, so one click may fire twice; that's
         harmless while the only action is `set`.
@@ -77,8 +83,9 @@ throw.
     reported.
   - Unexpected exceptions, which are probably loader bugs, are logged with a stack trace.
   - Only `.yml` and `.yaml` files are loaded, so editor backups are skipped.
-  - [ ] Test in game with some broken files. `test.yml` should now warn about `spreads-to`
-        and `rumour` under `helga_exposed` (see "Rumours are ignored" above).
+  - [x] Tests for broken files, in `test/org/pale/gemininpc/quests/QuestLoadTest.java`. It also
+        checks that `banner.yml`, a copy of the example quest, loads with no warnings; copy
+        the server's `test.yml` over it when that changes.
   - [ ] Duplicate quest `id`s across files aren't detected. Do this when quests are kept in a
         map (see the item above).
   - [x] `Plugin.processFilesInConfigDirectory`, which personae and templates also use: a missing
@@ -154,9 +161,9 @@ built by reflection.
       handles `give ITEM` and `start: QUEST`.
 - [ ] Counters or other non-boolean facts. The expression language already handles integers
       and strings, so most of the work is in the state and in the actions, e.g. `add:`.
-- [ ] The `x` placeholder for facts with no data. Try `fact: {}` instead.
+- [x] The `x` placeholder for facts with no data. The example now uses `fact: {}` instead.
 - [ ] YAML quoting: a condition that starts with a quote, `[`, `{`, `*`, `&`, `!` or `#`, or
       contains `: `, must have the whole value quoted. Document this in the README.
 - [ ] README section on quests: file format, the expression language, triggers and actions.
-- [ ] Get Maven to run the tests in `./test`, by setting `<testSourceDirectory>` or something
-      similar.
+- [x] Get Maven to run the tests in `./test`, by setting `<testSourceDirectory>`. Note that
+      `mvn` (`clean install`) now fails if a test fails.

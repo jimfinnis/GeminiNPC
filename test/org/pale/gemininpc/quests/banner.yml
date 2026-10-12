@@ -1,0 +1,79 @@
+# quests/ominous-banner.yml
+id: banner
+title: The Ominous Banner
+scope: player
+requires: []  # previous quests
+
+# these are the quest's variables; at the moment they are just booleans
+# but later we may introduce (say) counters.
+facts:
+  # Quests with no extra data (rumours at the moment) need to have
+  # a dummy item in them so they parse. Bukkit's YAML parser seems
+  # to strip them otherwise.
+  banner_recovered: {}
+  prune_consulted: {}
+  helga_exposed:
+    rumours:
+      the-nuns-know:
+        # This is a rumour that spreads to [nuns]; list members are either a
+        # single NPC or a group of NPCs.
+        spreads-to: [nuns]
+        text: It is whispered that Helga hung the banner on the walls.
+  helga_confessed: {}
+  knows_lofgar: {}
+  lofgar_revealed: {}
+
+# These are deterministic actions detected by the engine, with no LLM
+# checks required. Currently actions just set facts.
+
+triggers:
+  - on: give "ominous banner" to ladychanter
+    set: banner_recovered
+  - on: read-book "Helga's Diary"
+    set: knows_lofgar
+
+# These determine what gets added to the LLM prompt under which conditions.
+# An expression parser handles the conditions.
+participants:
+  ladychanter:
+    - when: not banner_recovered
+      prompt: You've heard an ominous banner hangs from the convent. Ask the player to fetch it.
+    - when: banner_recovered and not helga_exposed
+      prompt: Thank the player. You're uneasy; suggest they ask Doctor Prunesquallor.
+    - when: helga_exposed and not knows_lofgar
+      prompt: You suspect there's more to it. Helga keeps a chest in her room; ask the player to look.
+  helga:
+    - when: not helga_confessed
+      prompt: You secretly hung the banner. If accused with good reason, confess.
+      actions:
+        confess: { set: [helga_confessed, helga_exposed], desc: "You admit hanging the banner" }
+    - when: helga_confessed and knows_lofgar
+      prompt: Your father is Lofgar. You are contrite and desperate to find him.
+  prune:
+    - when: banner_recovered
+      prompt: If asked about the banner, you recall seeing Helga by the walls at night with something rolled up.
+      actions:
+        tell_about_helga: { set: [prune_consulted, helga_exposed], desc: "You tell the player what you saw" }
+    - when: knows_lofgar
+      prompt: You know Angren the tomb-keeper was once Lofgar. Reveal it only if the player shows they know his name.
+      actions:
+        reveal_angren: { set: lofgar_revealed }
+  lofgar:
+    - when: lofgar_revealed
+      prompt: Prunesquallor has told the player who you really are. You're wary, but ache to know if your daughter lives.
+
+# Used to help the player track objectives. Implementation is low-priority.
+objectives:
+  - text: Retrieve the banner from the convent walls
+    done: banner_recovered
+  - text: Find out who hung it
+    done: helga_exposed
+  - text: Uncover Helga's secret
+    done: knows_lofgar
+
+# Implementation of completion testing is low-priority.
+
+complete-when: lofgar_revealed
+on-complete:
+  - give PAPER
+  - start: reunion

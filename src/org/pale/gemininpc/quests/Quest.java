@@ -5,7 +5,6 @@ import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.MemoryConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
-import org.pale.gemininpc.Plugin;
 import org.pale.gemininpc.quests.triggers.Trigger;
 
 import java.io.IOException;
@@ -56,14 +55,15 @@ public class Quest {
     private static final Set<String> TOP_LEVEL_KEYS = Set.of("id", "title", "scope", "requires", "facts",
             "triggers", "participants", "objectives", "complete-when", "on-complete");
 
-    /// The name of the file this quest came from, used in warnings.
-    final String fileName;
+    /// Problems which don't stop the quest loading, each as "where: message". This is the list passed to
+    /// the constructor, so the caller still has the warnings if loading then fails.
+    final List<String> warnings;
 
     /// Load the quest. Throws a `QuestException` if the file is bad; the message says where in the file
-    /// the problem is but not which file, which the caller adds.
-    public Quest(Path path){
-        fileName = path.getFileName().toString();
-        Plugin.log("Loading quest " + path);
+    /// the problem is but not which file, which the caller adds. Warnings are added to `warnings` rather
+    /// than logged, so that quests can be loaded without the plugin running (e.g. in tests).
+    public Quest(Path path, List<String> warnings){
+        this.warnings = warnings;
         // loadConfiguration() would log a syntax error and carry on with an empty config, so load
         // the file ourselves to get the error (with its line number) as an exception.
         YamlConfiguration root = new YamlConfiguration();
@@ -158,9 +158,9 @@ public class Quest {
         return maps;
     }
 
-    /// Log a problem with the quest that doesn't stop it loading.
+    /// Record a problem with the quest that doesn't stop it loading.
     public void warn(String where, String msg){
-        Plugin.warn("Quest file " + fileName + ": " + where + ": " + msg);
+        warnings.add(where + ": " + msg);
     }
 
     /// Warn about any keys in a section which aren't in `allowed`. Unknown keys are usually typos, or

@@ -116,6 +116,7 @@
   
   <build>
     <sourceDirectory>src</sourceDirectory>
+    <testSourceDirectory>test</testSourceDirectory>
     <defaultGoal>clean install</defaultGoal>
     <resources>
       <resource>

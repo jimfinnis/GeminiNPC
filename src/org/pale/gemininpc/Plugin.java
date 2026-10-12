@@ -326,14 +326,20 @@ public class Plugin extends JavaPlugin implements Listener {
                     if(!name.endsWith(".yml") && !name.endsWith(".yaml"))
                         return;
                     // a bad quest file is skipped with a warning, rather than stopping the plugin loading
+                    log("Loading quest " + path);
+                    List<String> warnings = new ArrayList<>();
                     try {
-                        Quest q = new Quest(path);
+                        Quest q = new Quest(path, warnings);
                     } catch (QuestException e) {
                         warn("Quest file " + name + " not loaded: " + e.getMessage());
                         if(!e.isExpected())   // probably a bug in the loader rather than in the file
                             getLogger().log(Level.WARNING, "Unexpected error loading quest " + name, e);
                     } catch (RuntimeException e) {
                         getLogger().log(Level.WARNING, "Unexpected error loading quest " + name, e);
+                    } finally {
+                        // log the warnings even if loading failed, since an unknown key may explain the error
+                        for(String w: warnings)
+                            warn("Quest file " + name + ": " + w);
                     }
                 });
 
