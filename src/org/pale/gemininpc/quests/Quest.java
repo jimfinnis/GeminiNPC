@@ -5,6 +5,8 @@ import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.MemoryConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.entity.Player;
+import org.pale.gemininpc.quests.expr.Parser;
+import org.pale.gemininpc.quests.expr.TreeNode;
 import org.pale.gemininpc.quests.triggers.Trigger;
 
 import java.io.IOException;
@@ -43,6 +45,15 @@ public class Quest {
      * and/or setting Facts.
      */
     Map<String, NPCQuestData> npcData = new HashMap<>();
+
+    /// Something for the player to do, shown to them so they can track the quest. It's done when the
+    /// expression is true.
+    record Objective(String text, TreeNode done) {}
+
+    List<Objective> objectives = new ArrayList<>();
+
+    /// The quest is complete when this is true; null if the quest has no complete-when and is open-ended.
+    TreeNode completeWhen;
 
     /**
      * Instances of the quest actually running, keyed by player UUID. If there is only one global instance
@@ -87,10 +98,42 @@ public class Quest {
             throw new QuestException("requires must be a list of quest IDs, e.g. requires: [quest1, quest2]");
         requires = new HashSet<>(root.getStringList("requires"));   // Ignored at the moment TODO
 
-        // facts must come first, because triggers and participants are checked against them
+        // facts must come first, because everything else is checked against them
         loadFacts(section(root, "facts"));
         loadTriggers(mapList(root, "triggers", "triggers"));
         loadNPCData(section(root, "participants"));
+        loadObjectives(mapList(root, "objectives", "objectives"));
+
+        // a quest with no complete-when is allowed; it's open-ended, e.g. a world quest that never finishes
+        if(root.contains("complete-when"))
+            completeWhen = parseExpression("complete-when", root.getString("complete-when"));
+    }
+
+    /// Parse an expression whose identifiers must all be facts of this quest.
+    /// @param key the key the expression came from, for the error message
+    TreeNode parseExpression(String key, String s){
+        Parser parser = new Parser();
+        parser.registerVariables(facts.keySet());
+        try {
+            return parser.parse(s);
+        } catch (RuntimeException e) {
+            throw new QuestException(key + ": " + e.getMessage() + ", in \"" + s + "\"");
+        }
+    }
+
+    /// Get the facts named by a key such as `set:`, which may be a single fact or a list of them, and check
+    /// that they all exist. Returns an empty list if the key isn't there.
+    public List<String> factNames(ConfigurationSection cs, String key){
+        if(!cs.contains(key))
+            return List.of();
+        List<String> names = cs.isList(key) ? cs.getStringList(key) : List.of(cs.getString(key));
+        if(names.isEmpty())
+            throw new QuestException(key + ": no facts given");
+        for(String n: names){
+            if(!facts.containsKey(n))
+                throw new QuestException(key + ": there is no fact called \"" + n + "\"");
+        }
+        return names;
     }
 
     private void loadFacts(ConfigurationSection r){
@@ -118,6 +161,23 @@ public class Quest {
             // and turn into a ConfigurationSection inside the ctor.
             String where = "participants." + npc;
             npcData.put(npc, new NPCQuestData(this, where, mapList(r, npc, where)));
+        }
+    }
+
+    private void loadObjectives(List<Map<?,?>> maps){
+        for(int i=0; i<maps.size(); i++){
+            String where = "objectives #" + (i+1);
+            ConfigurationSection cs = new MemoryConfiguration().createSection("r", maps.get(i));
+            QuestException.in(where, () -> {
+                warnUnknownKeys(cs, where, Set.of("text", "done"));
+                String text = cs.getString("text");
+                if(text==null)
+                    throw new QuestException("no text:");
+                String done = cs.getString("done");
+                if(done==null)
+                    throw new QuestException("no done:");
+                objectives.add(new Objective(text, parseExpression("done", done)));
+            });
         }
     }
 

@@ -60,6 +60,20 @@ public class QuestLoadTest {
         Set<Fact.Rumour> rumours = q.getFact("helga_exposed").rumours;
         assertEquals(1, rumours.size());
         assertEquals(Set.of("nuns"), rumours.iterator().next().npcNames());
+
+        // conditions are in a set, so find Helga's one with an action
+        NPCQuestCondition.Action confess = q.npcData.get("helga").conditions.stream()
+                .map(c -> c.actions.get("confess")).filter(a -> a != null).findFirst().orElseThrow();
+        assertEquals(List.of("helga_confessed", "helga_exposed"), confess.set());
+        assertEquals("You admit to the player that you hung the banner", confess.desc());
+        NPCQuestCondition.Action reveal = q.npcData.get("prune").conditions.stream()
+                .map(c -> c.actions.get("reveal_angren")).filter(a -> a != null).findFirst().orElseThrow();
+        assertEquals(List.of("lofgar_revealed"), reveal.set());   // a single fact rather than a list
+        assertEquals("You tell the player that Angren the tomb-keeper is Lofgar", reveal.desc());
+
+        assertEquals(3, q.objectives.size());
+        assertEquals("Retrieve the banner from the convent walls", q.objectives.getFirst().text());
+        assertNotNull(q.completeWhen);
     }
 
     @Test
@@ -67,6 +81,8 @@ public class QuestLoadTest {
         Quest q = load(HEADER);
         assertEquals("q", q.id);
         assertTrue(q.facts.isEmpty());
+        assertTrue(q.objectives.isEmpty());
+        assertNull(q.completeWhen);
         assertEquals(List.of(), warnings);
     }
 
@@ -202,6 +218,42 @@ public class QuestLoadTest {
     }
 
     @Test
+    void triggerSetsListOfFacts() throws IOException {
+        load(HEADER + """
+                facts:
+                  f: {}
+                  g: {}
+                triggers:
+                  - on: read-book x
+                    set: [f, g]
+                """);
+        assertEquals(List.of(), warnings);
+    }
+
+    @Test
+    void triggerSetsUnknownFactInList() {
+        assertEquals("triggers #1: set: there is no fact called \"h\"", fails(HEADER + """
+                facts:
+                  f: {}
+                  g: {}
+                triggers:
+                  - on: read-book x
+                    set: [f, h]
+                """));
+    }
+
+    @Test
+    void triggerSetsEmptyList() {
+        assertEquals("triggers #1: set: no facts given", fails(HEADER + """
+                facts:
+                  f: {}
+                triggers:
+                  - on: read-book x
+                    set: []
+                """));
+    }
+
+    @Test
     void triggerWithoutAction() {
         String msg = fails(HEADER + """
                 triggers:
@@ -257,6 +309,171 @@ public class QuestLoadTest {
                     - when: f
                 """);
         assertEquals(List.of("participants.helga #1: no prompt: or actions:, so this does nothing"), warnings);
+    }
+
+    // ---- NPC actions ----
+
+    @Test
+    void actionWithoutPromptIsFine() throws IOException {
+        load(HEADER + """
+                facts:
+                  f: {}
+                participants:
+                  helga:
+                    - when: not f
+                      actions:
+                        confess: { set: f, desc: "You confess" }
+                """);
+        assertEquals(List.of(), warnings);
+    }
+
+    @Test
+    void actionSetsUnknownFact() {
+        assertEquals("participants.helga #1: actions.confess: set: there is no fact called \"g\"", fails(HEADER + """
+                facts:
+                  f: {}
+                participants:
+                  helga:
+                    - when: f
+                      actions:
+                        confess: { set: [f, g] }
+                """));
+    }
+
+    @Test
+    void actionWithoutSet() {
+        String msg = fails(HEADER + """
+                facts:
+                  f: {}
+                participants:
+                  helga:
+                    - when: f
+                      actions:
+                        confess: { desc: "You confess" }
+                """);
+        assertTrue(msg.startsWith("participants.helga #1: actions.confess: no set:"), msg);
+    }
+
+    @Test
+    void actionWithoutDesc() {
+        String msg = fails(HEADER + """
+                facts:
+                  f: {}
+                participants:
+                  helga:
+                    - when: f
+                      actions:
+                        confess: { set: f }
+                """);
+        assertTrue(msg.startsWith("participants.helga #1: actions.confess: no desc:"), msg);
+    }
+
+    @Test
+    void actionWithBlankDesc() {
+        String msg = fails(HEADER + """
+                facts:
+                  f: {}
+                participants:
+                  helga:
+                    - when: f
+                      actions:
+                        confess: { set: f, desc: "  " }
+                """);
+        assertTrue(msg.startsWith("participants.helga #1: actions.confess: no desc:"), msg);
+    }
+
+    @Test
+    void actionMustBeMap() {
+        String msg = fails(HEADER + """
+                facts:
+                  f: {}
+                participants:
+                  helga:
+                    - when: f
+                      actions:
+                        confess: f
+                """);
+        assertTrue(msg.startsWith("participants.helga #1: actions.confess: must contain set:"), msg);
+    }
+
+    @Test
+    void actionsMustBeMap() {
+        String msg = fails(HEADER + """
+                facts:
+                  f: {}
+                participants:
+                  helga:
+                    - when: f
+                      actions: [confess]
+                """);
+        assertTrue(msg.startsWith("participants.helga #1: actions must be a map"), msg);
+    }
+
+    @Test
+    void unknownActionKeyWarns() throws IOException {
+        load(HEADER + """
+                facts:
+                  f: {}
+                participants:
+                  helga:
+                    - when: f
+                      actions:
+                        confess: { set: f, desc: "You confess", colour: red }
+                """);
+        assertEquals(List.of("participants.helga #1.actions.confess: unknown key \"colour\" (ignored)"),
+                warnings);
+    }
+
+    // ---- objectives and complete-when ----
+
+    @Test
+    void objectiveWithoutText() {
+        assertEquals("objectives #1: no text:", fails(HEADER + """
+                facts:
+                  f: {}
+                objectives:
+                  - done: f
+                """));
+    }
+
+    @Test
+    void objectiveWithoutDone() {
+        assertEquals("objectives #1: no done:", fails(HEADER + """
+                objectives:
+                  - text: Do something
+                """));
+    }
+
+    @Test
+    void objectiveBadDone() {
+        String msg = fails(HEADER + """
+                facts:
+                  f: {}
+                objectives:
+                  - text: Do something
+                    done: f
+                  - text: Do something else
+                    done: g
+                """);
+        assertTrue(msg.startsWith("objectives #2: done: "), msg);
+        assertTrue(msg.contains("\"g\""), msg);
+    }
+
+    @Test
+    void objectiveMustBeMap() {
+        String msg = fails(HEADER + "objectives:\n  - Do something\n");
+        assertTrue(msg.startsWith("objectives #1 must be a map"), msg);
+    }
+
+    @Test
+    void badCompleteWhen() {
+        String msg = fails(HEADER + """
+                facts:
+                  f: {}
+                complete-when: f and
+                """);
+        assertTrue(msg.startsWith("complete-when: "), msg);
+        assertTrue(msg.contains("\"f and\""), msg);
     }
 
     @Test

@@ -1,16 +1,17 @@
 # Quests: still to do
 
-What remains on `feature/quests`. The example quest is
-`D:\mc\plugins\GeminiNPC\quests\test.yml` ("The Ominous Banner").
+What remains on `feature/quests`. The example quest ("The Ominous Banner") is
+`test/org/pale/gemininpc/quests/banner.yml`. Edit it there: `copy.bat` copies it to the test
+server as `test.yml`.
 
 ## Done
 
 - An expression language for conditions in `quests/expr`, covering the lexer, Pratt parser,
   values and evaluator, with tests in `test/org/pale/gemininpc/quests/expr`.
-- At load time, `when:` conditions are parsed and each identifier is checked against the
-  quest's `facts`.
-- Loading of `id`, `title`, `scope`, `requires`, `facts` (in part), `triggers` and
-  `participants`.
+- At load time, `when:`, `done:` and `complete-when` are parsed and each identifier is checked
+  against the quest's `facts`, as are the facts named in `set:`.
+- Loading of `id`, `title`, `scope`, `requires`, `facts`, `triggers`, `participants` (including
+  their actions), `objectives` and `complete-when`, with tests in `QuestLoadTest`.
 - A trigger framework (`Trigger`, `ITriggerCondition`, `ITriggerAction`, `TriggerEvent`) with
   two conditions, `give` and `read-book`, and one action, `set`, which sets a fact in the quest's `Instance`.
 
@@ -56,14 +57,16 @@ throw.
   - [ ] Test in game: books in either hand, sneak-clicking a block while holding a book, and
         lecterns. `PlayerInteractEvent` fires once per hand, so one click may fire twice; that's
         harmless while the only action is `set`.
-- [ ] **Facts named in `set:` aren't checked.** Done for triggers; still to do for NPC
-      actions' `set:`, against `facts` at load time, as `when:` identifiers already are.
+- [x] **Facts named in `set:` are checked**, for both triggers and NPC actions, by
+      `Quest.factNames`. `set:` can be a single fact or a list in both places.
 - [ ] **Validate the rest of the file at load time:**
-  - every `objectives[].done` and `complete-when` should parse as an expression against the
-    facts;
-  - `requires` should name quests that exist; check this after all quests have loaded;
-  - participant names should be known NPCs, or at least a typo should produce a warning.
-- [ ] Load `objectives`, `complete-when` and `on-complete`; they're read nowhere yet.
+  - [x] every `objectives[].done` and `complete-when` parses as an expression against the
+    facts (`Quest.parseExpression`, which `when:` also uses);
+  - [ ] `requires` should name quests that exist; check this after all quests have loaded;
+  - [ ] participant names should be known NPCs, or at least a typo should produce a warning.
+- [x] `objectives` and `complete-when` are loaded into `Quest.objectives` and
+      `Quest.completeWhen`. `complete-when` is optional; without it a quest is open-ended.
+- [ ] Load `on-complete`; it's read nowhere yet.
 
 ## Wiring quests into the plugin
 
@@ -84,8 +87,7 @@ throw.
   - Unexpected exceptions, which are probably loader bugs, are logged with a stack trace.
   - Only `.yml` and `.yaml` files are loaded, so editor backups are skipped.
   - [x] Tests for broken files, in `test/org/pale/gemininpc/quests/QuestLoadTest.java`. It also
-        checks that `banner.yml`, a copy of the example quest, loads with no warnings; copy
-        the server's `test.yml` over it when that changes.
+        checks that the example quest, `banner.yml`, loads with no warnings.
   - [ ] Duplicate quest `id`s across files aren't detected. Do this when quests are kept in a
         map (see the item above).
   - [x] `Plugin.processFilesInConfigDirectory`, which personae and templates also use: a missing
@@ -128,11 +130,16 @@ These are things the LLM can choose to do, such as Helga's `confess`. They're th
 part, because they connect quest data to the existing `@Action` system, which is static and
 built by reflection.
 
-- [ ] **Loading.**
-  - `NPCQuestCondition` should parse `actions:` as a map from action name to `set:` (one fact or
-    a list) plus `desc:`.
-  - `desc` is optional; see `reveal_angren`. Decide on a default.
-  - Check the facts named in `set:` against the quest's facts.
+- [x] **Loading.** `NPCQuestCondition.actions` maps each action name to an `Action` record of
+      the facts to set and the description. `set:` is required and its facts are checked.
+      `desc:` is also required.
+  - The NPC's `prompt` decides whether and when the NPC does something (Prune reveals
+    Angren's identity "only if the player shows they know his name"). The `desc` says what
+    event the action records, so that the LLM includes the action in the reply in which that
+    event happens. Write it as one visible event, e.g. "You tell the player that Angren the
+    tomb-keeper is Lofgar", not as a condition or a vague state. The plan is for the template
+    to supply the "use this when..." instruction, so authors don't have to; it doesn't yet
+    (see "Offering actions to the LLM" below).
 - [ ] **Offering actions to the LLM.**
   - An action is available only while its `when` is true, and only to that NPC.
   - The current action list comes from `{{actions("group")}}` in the `common` template, built
@@ -140,6 +147,24 @@ built by reflection.
     per-turn context along with the quest prompts, or the system instruction must be
     regenerated whenever they change. The context is likely to be the better option.
   - Describe them consistently with the existing actions, using a name and a description.
+  - Introduce them with a standing instruction in the template, roughly: "These actions record
+    important story events. If your reply does what an action describes, you must include
+    that action in the same reply. Don't do the action without the event, or the event without
+    the action." The likely failure is the NPC revealing something in its text but leaving
+    `action` empty. The fact then never gets set, and the player can be stuck (e.g. Lofgar
+    never gets his prompt).
+- [ ] **Only one action per reply.** `Chat.Response.action` is a single string, so a reply
+      that needs a quest action and a built-in one (e.g. Helga confesses and hands over an
+      item) loses one of them. Since quest actions are what move the story on, make `action`
+      a list, or give quest actions their own field, before wiring quest actions in. This
+      affects the JSON shape in the `common` template, `Chat.Response`, `processResponse` and
+      the README.
+- [ ] **Recovering from a missed action.** The NPC's `when` stays true after it reveals
+      something in text without the action, so it will probably reveal it again when asked,
+      which gives the LLM another chance; that's not guaranteed, though. The admin escape hatch
+      is `/gemini quest set` (see "Commands for debugging"). If testing shows actions being
+      missed often, consider a cheap second check, such as a small LLM call asking "did this
+      reply reveal X?".
 - [ ] **Dispatch.** `ActionRegistry.handleAction` looks up only the reflected `@Action` methods.
   - It needs a fallback: if the name isn't a built-in action, look it up among the quest actions
     currently available to this NPC and player.

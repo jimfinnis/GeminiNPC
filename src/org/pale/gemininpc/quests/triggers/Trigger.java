@@ -38,16 +38,11 @@ public class Trigger {
         cond = parseCondition(cstr);
 
         // actions - you can only have one of each type, simply because it makes the quest code neater.
-        String astr = cs.getString("set");
-        if (astr != null) {
-            // at the moment the set is just the name of a boolean fact. Later we should be able to
-            // set multiple data and possibly to non-boolean values. We could make use of the expression
-            // system to do this, with assignment operators (and with access to assignment operators gated
-            // on the type of expression we are parsing).
-            if(quest.getFact(astr)==null)
-                throw new QuestException("set: there is no fact called \"" + astr + "\"");
-            actions.add(new SetAction(astr));
-        }
+        // set: is one boolean fact or a list of them, as for NPC actions. Later we should be able to
+        // set non-boolean values. We could make use of the expression system to do this, with assignment
+        // operators (and with access to assignment operators gated on the type of expression we are parsing).
+        for(String fact: quest.factNames(cs, "set"))
+            actions.add(new SetAction(fact));
         // add more later!
 
         if(actions.isEmpty())
