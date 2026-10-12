@@ -12,7 +12,7 @@ What remains on `feature/quests`. The example quest is
 - Loading of `id`, `title`, `scope`, `requires`, `facts` (in part), `triggers` and
   `participants`.
 - A trigger framework (`Trigger`, `ITriggerCondition`, `ITriggerAction`, `TriggerEvent`) with
-  one condition, `give`, and one action, `set`, which sets a fact in the quest's `Instance`.
+  two conditions, `give` and `read-book`, and one action, `set`, which sets a fact in the quest's `Instance`.
 
 ## The loader doesn't match the example file
 
@@ -32,9 +32,24 @@ throw.
       material name.
   - [ ] Test in game that the ominous banner matches. Its name is a translatable item-name
         component, and `getItemName()` may not return plain "Ominous Banner".
-- [ ] **`read-book` isn't a trigger condition yet.** Add it, along with a `TriggerEvent` record
-      and a listener hook. It probably needs `PlayerEditBookEvent`, or a check on opening a
-      book, since there's no direct "read" event.
+- [x] **`read-book` trigger condition.** `ReadBookCondition` (`read-book NAME`) matches a
+      `TriggerEvent.ReadBook` on the book's display name, ignoring case. `ChatEventListener`
+      detects reading through `PlayerInteractEvent` (right-clicking a written book or book and
+      quill in hand) and `InventoryOpenEvent` (opening a lectern), both of which call
+      `bookRead`. Still to do:
+  - [ ] Join them up: `bookRead` only logs; it should fire a `TriggerEvent.ReadBook` (see
+        "Firing triggers" below).
+  - [ ] `ReadBookCondition.check` calls `name.equalsIgnoreCase(...)` on the event's name, so a
+        book with no display name will throw if `bookRead` passes null. Swap the comparison
+        round or pass `""`.
+  - [ ] Decide whether to strip colour codes from the display name before comparing, and whether
+        a written book's title should also match.
+  - [ ] Remove the debug code: the `snark` helper (unused), the logging in `bookRead`, and the
+        unused imports (`Material`, `InventoryEvent`, `PlayerTakeLecternBookEvent`).
+  - [ ] The `read-book` parse error doesn't include the condition text; the `give` one does.
+  - [ ] Test in game: books in either hand, sneak-clicking a block while holding a book, and
+        lecterns. `PlayerInteractEvent` fires once per hand, so one click may fire twice; that's
+        harmless while the only action is `set`.
 - [ ] **Facts named in `set:` aren't checked.** Done for triggers; still to do for NPC
       actions' `set:`, against `facts` at load time, as `when:` identifiers already are.
 - [ ] **Validate the rest of the file at load time:**
@@ -48,9 +63,27 @@ throw.
 
 - [ ] **Keep the loaded quests.** `Plugin` builds a `Quest` for each file and then throws it
       away. Store them in a map by `id` and rebuild it on `/gemini reload`.
-- [ ] **Decide what happens when a quest file is bad.** One broken quest file should log a
-      clear error naming the file and the problem, not stop the plugin from loading. Parse
-      errors already have good messages; add the file name and the condition text.
+- [x] **Decide what happens when a quest file is bad.** A bad file is now skipped with a
+      warning such as `Quest file test.yml not loaded: participants.helga #2: when: expected a
+      value but the expression ended, in "not"`, and the plugin carries on. As a
+      `QuestException` passes up through the loader, `QuestException.in` adds where the problem
+      is to its message. Also:
+  - YAML syntax errors are reported with their line number. `loadConfiguration` used to
+    swallow them, and the result was a misleading "no id".
+  - `section` and `mapList` in `Quest` check the shape of values, which Bukkit used to drop
+    silently. For example, `- give x` instead of `- on: give x` was ignored.
+  - Unknown keys produce a warning, but the quest still loads.
+  - Triggers with no action, and NPC conditions with neither `prompt:` nor `actions:`, are
+    reported.
+  - Unexpected exceptions, which are probably loader bugs, are logged with a stack trace.
+  - Only `.yml` and `.yaml` files are loaded, so editor backups are skipped.
+  - [ ] Test in game with some broken files. `test.yml` should now warn about `spreads-to`
+        and `rumour` under `helga_exposed` (see "Rumours are ignored" above).
+  - [ ] Duplicate quest `id`s across files aren't detected. Do this when quests are kept in a
+        map (see the item above).
+  - [x] `Plugin.processFilesInConfigDirectory`, which personae and templates also use: a missing
+        directory no longer stops the whole config loading, and the `~` backup check now tests
+        each file rather than the directory name.
 - [ ] **Quest state.** Started: `Instance` holds a fact-value map, and `Quest.start` /
       `getInstance` keep one per player UUID for `scope: player` and one for `scope: world`.
       Still to do:
@@ -77,8 +110,8 @@ throw.
       actions on it. Still to do:
   - `Trigger.check` is package-private, so add a public entry point (on `Quest` or a quest
     manager) that checks an event against every loaded quest's triggers.
-  - Call `Trigger.check` from `ChatEventListener` on the matching Bukkit events, for example
-    NPC right-click gives for `give`.
+  - Call `Trigger.check` from `ChatEventListener` on the matching Bukkit events: NPC
+    right-click gives for `give`, and `bookRead` for `read-book`.
 - [ ] **Commands for debugging**, e.g. `/gemini quest list`, `/gemini quest state PLAYER`,
       `/gemini quest set PLAYER QUEST FACT true|false` and `/gemini quest reset`.
 

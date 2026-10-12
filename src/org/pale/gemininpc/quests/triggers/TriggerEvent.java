@@ -18,4 +18,10 @@ public interface TriggerEvent {
      * A player has given an item to an NPC.
      */
     record Give(NPC npc, ItemStack item) implements TriggerEvent {}
+
+    /**
+     * A player has read a book
+     * @param displayName - the book's display name (not title); you can set with /jcf dname
+     */
+    record ReadBook(String displayName) implements TriggerEvent {}
 }

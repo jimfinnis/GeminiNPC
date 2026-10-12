@@ -21,21 +21,24 @@ public class Fact {
 
     Set<Rumour> rumours = new HashSet<>();
 
-    /**
-     * @param cs the fact's section, or null if the fact has no data (e.g. "mustard-found:" with no value)
-     */
-    Fact(ConfigurationSection cs){
+    /// @param where where the fact is in the quest file, for warnings
+    /// @param cs the fact's section, or null if the fact has no data (e.g. "mustard-found:" with no value)
+    Fact(Quest q, String where, ConfigurationSection cs){
         if(cs==null)return;
+        q.warnUnknownKeys(cs, where, Set.of("rumours"));
         // rumours is a map of rumour name to rumour data
+        if(!cs.contains("rumours"))return;
         ConfigurationSection rs = cs.getConfigurationSection("rumours");
-        if(rs==null)return;
+        if(rs==null)
+            throw new QuestException("rumours must be a map of rumour names to rumours");
         for(String name: rs.getKeys(false)){
             ConfigurationSection r = rs.getConfigurationSection(name);
             if(r==null)
-                throw new RuntimeException("Rumour "+name+" in fact "+cs.getName()+" is not a section");
+                throw new QuestException("rumours." + name + " must contain spreads-to: and text:");
+            q.warnUnknownKeys(r, where + ".rumours." + name, Set.of("spreads-to", "text"));
             String text = r.getString("text");
             if(text==null)
-                throw new RuntimeException("No text in rumour "+name+" in fact "+cs.getName());
+                throw new QuestException("rumours." + name + ": no text:");
             rumours.add(new Rumour(new HashSet<>(r.getStringList("spreads-to")), text));
         }
     }

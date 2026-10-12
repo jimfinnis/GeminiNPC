@@ -4,10 +4,12 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.entity.Player;
 import org.pale.gemininpc.quests.Instance;
 import org.pale.gemininpc.quests.Quest;
+import org.pale.gemininpc.quests.QuestException;
 import org.pale.gemininpc.utils.TextUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * triggers are events that are triggered by external actions that aren't detected by the LLM - they
@@ -21,18 +23,17 @@ public class Trigger {
     List<ITriggerAction> actions = new ArrayList<>();
     Quest quest;
 
-    public Trigger(Quest q, ConfigurationSection cs) {
-        if(cs==null)
-            throw new RuntimeException("Trigger section is empty");
-
+    /// @param where where the trigger is in the quest file, for warnings
+    public Trigger(Quest q, String where, ConfigurationSection cs) {
         quest = q;
 
         // this is very annoying - "on" is considered a boolean in YAML, so if I want "on" as a key I have to call
         // it "true." I could use another name, but "on" is easy to remember. If someone quotes it ("on":) it
         // stays as "on", so accept that too.
+        q.warnUnknownKeys(cs, where, Set.of("on", "true", "set"));
         String cstr = cs.getString("on", cs.getString("true"));
         if (cstr == null)
-            throw new RuntimeException("No condition (on:) for trigger in quest "+q.id);
+            throw new QuestException("no on: condition");
 
         cond = parseCondition(cstr);
 
@@ -44,23 +45,33 @@ public class Trigger {
             // system to do this, with assignment operators (and with access to assignment operators gated
             // on the type of expression we are parsing).
             if(quest.getFact(astr)==null)
-                throw new RuntimeException("Fact "+astr+" does not exist in quest "+q.id);
+                throw new QuestException("set: there is no fact called \"" + astr + "\"");
             actions.add(new SetAction(astr));
         }
         // add more later!
+
+        if(actions.isEmpty())
+            throw new QuestException("no action (e.g. set:), so this trigger would do nothing");
     }
 
     private ITriggerCondition parseCondition(String s){
         List<String> ss = TextUtils.splitQuoted(s);
         if(ss.isEmpty())
-            throw new RuntimeException("condition is empty");
+            throw new QuestException("on: condition is empty");
         switch(ss.getFirst()){
             case "give" -> {
                 if(ss.size()!=4 || !ss.get(2).equals("to"))
-                    throw new RuntimeException("Bad give condition, should be: give ITEM to NPCNAME: "+s);
+                    throw new QuestException("on: bad give condition \"" + s + "\", should be: give ITEM to NPCNAME");
                 return new GiveCondition(ss.get(1), ss.get(3));
             }
-            default -> throw new RuntimeException("Unknown condition type: "+ss.getFirst());
+            case "read-book" -> {
+                if(ss.size()!=2)
+                    throw new QuestException("on: bad read-book condition \"" + s
+                            + "\", should be: read-book BOOK_DISPLAY_NAME");
+                return new ReadBookCondition(ss.get(1));
+            }
+            default -> throw new QuestException("on: unknown condition type \"" + ss.getFirst()
+                    + "\" in \"" + s + "\", should be give or read-book");
         }
     }
 

@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.stream.Stream;
+import java.util.logging.Level;
 
 import net.citizensnpcs.api.npc.NPC;
 import org.bukkit.Bukkit;
@@ -34,6 +35,7 @@ import org.pale.gemininpc.ai.Persona;
 import org.pale.gemininpc.commands.*;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
 import org.pale.gemininpc.quests.Quest;
+import org.pale.gemininpc.quests.QuestException;
 import org.pale.gemininpc.waypoints.Waypoint;
 import org.pale.gemininpc.waypoints.Waypoints;
 
@@ -223,24 +225,24 @@ public class Plugin extends JavaPlugin implements Listener {
         List<String> dirlist = cs.getStringList(dirListName);
         for(String s: dirlist){
             Path p = Paths.get(s);
-            if(p.toString().endsWith("~"))  // skip MicroEmacs backup files!
-                continue;
             if(!p.isAbsolute()){
                 p = Paths.get(getServer().getWorldContainer().getAbsolutePath(),s);
             }
-            if(!p.toFile().exists()){
-                warn(dirListName+" directory "+p+" does not exist");
-            } else {
-                log(dirListName+" directory: "+p);
+            // a missing directory shouldn't stop the rest of the config loading
+            if(!Files.isDirectory(p)){
+                warn(dirListName+" directory "+p+(Files.exists(p) ? " is not a directory" : " does not exist"));
+                continue;
             }
+            log(dirListName+" directory: "+p);
             try(Stream<Path> entries = Files.list(p)) {
-                // for each file in the directory, run the function
-                entries.forEach(f -> {
-                    String name = f.getFileName().toString();
-                    function.run(name, f);
-                });
+                // for each file in the directory, run the function. Sort them so that the load order
+                // (and so which file wins if two define the same thing) doesn't depend on the filesystem.
+                entries.filter(Files::isRegularFile)
+                        .filter(f -> !f.getFileName().toString().endsWith("~"))  // skip MicroEmacs backup files!
+                        .sorted()
+                        .forEach(f -> function.run(f.getFileName().toString(), f));
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                warn("cannot read "+dirListName+" directory "+p+": "+e.getMessage());
             }
         }
     }
@@ -320,7 +322,19 @@ public class Plugin extends JavaPlugin implements Listener {
         Plugin.log("Loading quests!");
         processFilesInConfigDirectory(c, "quest-directories",
                 (name, path) -> {
-                    Quest q = new Quest(path);
+                    // skip editor backups (e.g. "quest.yml~") and anything else that isn't YAML
+                    if(!name.endsWith(".yml") && !name.endsWith(".yaml"))
+                        return;
+                    // a bad quest file is skipped with a warning, rather than stopping the plugin loading
+                    try {
+                        Quest q = new Quest(path);
+                    } catch (QuestException e) {
+                        warn("Quest file " + name + " not loaded: " + e.getMessage());
+                        if(!e.isExpected())   // probably a bug in the loader rather than in the file
+                            getLogger().log(Level.WARNING, "Unexpected error loading quest " + name, e);
+                    } catch (RuntimeException e) {
+                        getLogger().log(Level.WARNING, "Unexpected error loading quest " + name, e);
+                    }
                 });
 
         // finally pull in the common texts, which are in the "texts" section.

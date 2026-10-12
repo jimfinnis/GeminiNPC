@@ -18,10 +18,12 @@ import java.util.Set;
 class NPCQuestData {
     Set<NPCQuestCondition> conditions = new HashSet<>();
 
-    NPCQuestData(Quest quest, List<Map<?,?>> maps){
-        for(var map: maps){
-            ConfigurationSection cs = new MemoryConfiguration().createSection("r",map);
-            conditions.add(new NPCQuestCondition(quest, cs));
+    /// @param where where this NPC's data is in the quest file, e.g. "participants.helga"
+    NPCQuestData(Quest quest, String where, List<Map<?,?>> maps){
+        for(int i=0; i<maps.size(); i++){
+            String itemWhere = where + " #" + (i+1);
+            ConfigurationSection cs = new MemoryConfiguration().createSection("r", maps.get(i));
+            QuestException.in(itemWhere, () -> conditions.add(new NPCQuestCondition(quest, itemWhere, cs)));
         }
     }
 }

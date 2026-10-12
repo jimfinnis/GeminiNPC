@@ -8,16 +8,28 @@ import net.citizensnpcs.trait.ShopTrait;
 import net.citizensnpcs.trait.shop.ItemAction;
 import net.citizensnpcs.trait.shop.NPCShopAction;
 import org.bukkit.ChatColor;
+import org.bukkit.Material;
+import org.bukkit.block.Block;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.inventory.InventoryEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.player.PlayerEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerTakeLecternBookEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.LecternInventory;
+import org.bukkit.inventory.meta.BookMeta;
+import org.bukkit.inventory.meta.WritableBookMeta;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -50,6 +62,75 @@ public final class ChatEventListener implements Listener {
         } else {
             plugin.handleMessage(e.getPlayer(), e.getMessage());
         }
+    }
+
+    int snarkctr= 0;
+    private void snark(Event e, String msg){
+        msg = "Snark "+snarkctr+"   event handler debug - "+msg;
+        if(e instanceof PlayerEvent pe)
+            pe.getPlayer().sendMessage(msg);
+        else if(e instanceof InventoryOpenEvent ie)
+            ie.getPlayer().sendMessage(msg);
+        Plugin.log(msg);
+        snarkctr++;
+    }
+
+    /**
+     * Interaction with objects in inventory, which can trigger certain quest events.
+     * @param event
+     */
+    @EventHandler
+    public void interact(PlayerInteractEvent event){
+        Action a = event.getAction();
+        if(a!=Action.RIGHT_CLICK_AIR && a!=Action.RIGHT_CLICK_BLOCK) return;
+
+        if (a == Action.RIGHT_CLICK_BLOCK) {
+            Block b = event.getClickedBlock();
+            // isInteractable is quite a coarse set, so you may need to deal with other stuff.
+            if (b != null && b.getType().isInteractable() && !event.getPlayer().isSneaking()) {
+                return; // block handles the click; book won't open
+            }
+        }
+        // another plugin may have blocked item use
+        if (event.useItemInHand() == Event.Result.DENY) return;
+        // we're clicking with something.
+        ItemStack item = event.getItem();
+        if(item == null)return;
+        switch(item.getType()){
+            // add more types of object here if required
+            case WRITTEN_BOOK, WRITABLE_BOOK -> {
+                if(item.getItemMeta() instanceof WritableBookMeta m){
+                    bookRead(event.getPlayer(), m);
+                }
+            }
+        }
+    }
+
+    /**
+     * Inventory opening can also produce events, e.g. on a lectern reading a book
+     */
+
+    @EventHandler
+    public void inventoryOpen(InventoryOpenEvent event){
+        if(event.getInventory() instanceof LecternInventory inv && event.getPlayer() instanceof Player player){
+            ItemStack item = inv.getItem(0);
+            if(item != null && item.getItemMeta() instanceof WritableBookMeta m){
+                bookRead(player, m);
+            }
+        }
+    }
+
+
+    /**
+     * This actually handles the book reading, it's called from different event handlers because books
+     * can be read in different ways. This will probably use the book's display name, which the JCFUtils
+     * plugin can set with the /jcf dname command.
+     */
+    private void bookRead(Player p, WritableBookMeta m){
+        Plugin.log("Player "+p.getName()+" read book "+m.getItemName());
+        Plugin.log("  Display name: "+m.getDisplayName());
+        if(m instanceof BookMeta finished_book)
+            Plugin.log("  Title: "+(finished_book.hasTitle()?finished_book.getTitle():"(untitled)"));
     }
 
     /**
