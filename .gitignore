@@ -1,0 +1,14 @@
+# build output
+target/
+dependency-reduced-pom.xml
+
+# IntelliJ
+.idea/
+*.iml
+
+# third-party plugin jars the build needs (see CLAUDE.md); kept locally, not in the repo
+Citizens-*.jar
+Sentinel-*.jar
+
+# editor backups
+*~
