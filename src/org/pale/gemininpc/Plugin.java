@@ -278,6 +278,25 @@ public class Plugin extends JavaPlugin implements Listener {
         }
     }
 
+    /// Run a quest action the LLM chose, for the player the NPC was talking to. Returns false if the action
+    /// isn't one of this NPC's quest actions, so the caller should try the built-in actions; true if it was
+    /// dealt with here, whether it ran or was ignored because it isn't offered now. Errors are logged.
+    public boolean runQuestAction(NPC npc, UUID player, String action) {
+        List<String> log = new ArrayList<>();
+        try {
+            QuestRegistry.ActionOutcome o = quests.runNPCAction(npc.getId(), npc, player,
+                    getServer().getPlayer(player), action, log);
+            if(o == QuestRegistry.ActionOutcome.RAN)
+                saveQuestStates();
+            if(!log.isEmpty())
+                log("Quest action from " + npc.getName() + ": " + String.join(", ", log));
+            return o != QuestRegistry.ActionOutcome.NOT_QUEST_ACTION;
+        } catch (RuntimeException ex) {
+            getLogger().log(Level.WARNING, "Error running quest action " + action + " from " + npc.getName(), ex);
+            return true;    // it was a quest action that failed; don't try it as a built-in one
+        }
+    }
+
     public void checkQuestNPCs() {
         for(String w: quests.checkNPCs(QuestNPCs.getDirectory().all()))
             warn("Quest file " + w);
@@ -459,6 +478,8 @@ public class Plugin extends JavaPlugin implements Listener {
                 });
         // checks that need all the quests loaded
         for(String w: newQuests.checkRequires())
+            warn("Quest file " + w);
+        for(String w: newQuests.checkActionNames(actionRegistry.names()))
             warn("Quest file " + w);
         quests = newQuests;
         log("Loaded " + quests.size() + " quests");

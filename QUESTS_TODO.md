@@ -140,8 +140,8 @@ throw.
   - A file that can't be read is renamed to `queststate.yml.broken-<time>` rather than
     overwritten, and progress starts empty. If it can't even be renamed, nothing is saved
     until it's fixed.
-  - [ ] Anything else that changes quest state must call `Plugin.saveQuestStates()` too,
-        notably NPC quest actions once they're wired in.
+  - [x] Anything else that changes quest state must call `Plugin.saveQuestStates()` too; NPC
+        quest actions do, in `Plugin.runQuestAction`.
   - [x] Tested in game: quest progress survives a server restart.
 - [x] **Evaluating conditions.** `Instance.test(expr)` evaluates an expression against the
       instance's facts; it's true if the result is a nonzero integer.
@@ -200,6 +200,8 @@ throw.
           changes and Prunesquallor tells what he saw. `/gemini context` shows the context as
           if the NPC were talking to you.
     - [ ] 3. Offering quest actions and dispatching them to the partner's state, then saving.
+          Done (see "NPC quest actions" below). Tested in game: Prunesquallor did
+          `tell_about_helga` when told about the banner, and Helga did `confess` when accused.
 - [ ] **Rumours.** When a fact with rumours becomes true, add each rumour's text to the context
       of the NPCs in `spreads-to`. The names there can be single NPCs or groups such as `[nuns]`,
       so a group needs defining somewhere, perhaps in the persona or in config.
@@ -250,19 +252,14 @@ built by reflection.
     tomb-keeper is Lofgar", not as a condition or a vague state. The plan is for the template
     to supply the "use this when..." instruction, so authors don't have to; it doesn't yet
     (see "Offering actions to the LLM" below).
-- [ ] **Offering actions to the LLM.**
-  - An action is available only while its `when` is true, and only to that NPC.
-  - The current action list comes from `{{actions("group")}}` in the `common` template, built
-    once when the system instruction is rendered. So quest actions must either go in the
-    per-turn context along with the quest prompts, or the system instruction must be
-    regenerated whenever they change. The context is likely to be the better option.
-  - Describe them consistently with the existing actions, using a name and a description.
-  - Introduce them with a standing instruction in the template, roughly: "These actions record
-    important story events. If your reply does what an action describes, you must include
-    that action in the same reply. Don't do the action without the event, or the event without
-    the action." The likely failure is the NPC revealing something in its text but leaving
-    `action` empty. The fact then never gets set, and the player can be stuck (e.g. Lofgar
-    never gets his prompt).
+- [x] **Offering actions to the LLM.** `QuestRegistry.actionsFor(npcId, player)` gives the
+      actions whose `when` is true for this NPC, in quests active for the player (not complete
+      ones, whose state is finished with). `ContextBuilder` sends them each turn as
+      `"quest-actions": [{"action": NAME, "description": DESC}]`, always present, as an array
+      so that a changed list is always sent whole. The `common` template has the standing
+      instruction: if your reply does what an action describes, you MUST name it in the same
+      reply, and never one without the other. The likely failure is still the NPC revealing
+      something in its text but leaving `action` empty (see "Recovering from a missed action").
 - [ ] **Only one action per reply.** `Chat.Response.action` is a single string, so a reply
       that needs a quest action and a built-in one (e.g. Helga confesses and hands over an
       item) loses one of them. Since quest actions are what move the story on, make `action`
@@ -278,16 +275,19 @@ built by reflection.
       is `/gemini quest set` (see "Commands for debugging"). If testing shows actions being
       missed often, consider a cheap second check, such as a small LLM call asking "did this
       reply reveal X?".
-- [ ] **Dispatch.** `ActionRegistry.handleAction` looks up only the reflected `@Action` methods.
-  - It needs a fallback: if the name isn't a built-in action, look it up among the quest actions
-    currently available to this NPC and player.
-  - Look out for name clashes with built-in actions and between quests; prefix the names or
-    reject clashes at load time.
-- [ ] **Checking the action is valid.** Check the action against the current state when the LLM's
-      response arrives, which can be some time after the request was sent. If its `when` no
-      longer holds, or the response names an action that was never offered, ignore it.
-- [ ] **Which player?** The response's `player` field gives the target. Use it to find the
-      per-player state, and decide what to do if that player isn't in the quest.
+- [x] **Dispatch.** `GeminiNPCTrait.processResponse` takes the first word of the action and
+      tries `Plugin.runQuestAction` first, then the built-in actions. `QuestRegistry.runNPCAction`
+      runs it if it's offered now, on the partner's state, checks for completion, and the plugin
+      saves. Tested in `QuestActionsTest`.
+  - Name clashes with built-in actions get a warning at load (`checkActionNames`); while
+    offered, the quest action wins. Action names must be one word.
+  - [ ] Two quests offering the same action name to the same NPC at once: the first, in load
+        order, runs. Not checked at load, since participant names only resolve to NPCs later.
+- [x] **Checking the action is valid.** It's checked again when the reply arrives. A quest
+      action of this NPC's that isn't offered at that moment is ignored (and logged), rather
+      than falling through to the built-in actions.
+- [x] **Which player?** The partner the request was made for (recorded in the reply queue), not
+      the `player` field the LLM fills in.
 - [ ] **What actions can do.** Only `set:` exists now. Possible additions: `clear:`, giving
       items, starting another quest, or running a built-in action such as `give`.
   - [x] NPC quest actions have a `do:` list too, so they get every action type.
@@ -313,7 +313,10 @@ built by reflection.
 - [ ] README section on quests: file format, the expression language, triggers and actions.
       Include how to write NPCs for a quest: the persona holds only the NPC's public face and
       cover stories, and each secret goes in the stage prompt where the NPC may use it,
-      because an NPC can't reliably keep a secret that's in its prompt. The comment above
+      because an NPC can't reliably keep a secret that's in its prompt. And a fact records what the
+      player did, often out of the NPC's sight, so a prompt should say what the NPC knows and
+      how to react if the player shows they know it ("If the player tells you..."), not what
+      the player did, or the NPC magically knows. The comment above
       `participants:` in `banner.yml` explains this with examples.
 - [x] Get Maven to run the tests in `./test`, by setting `<testSourceDirectory>`. Note that
       `mvn` (`clean install`) now fails if a test fails.

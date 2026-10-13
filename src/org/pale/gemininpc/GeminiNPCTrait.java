@@ -417,7 +417,7 @@ public class GeminiNPCTrait extends Trait {
     /**
      * Handle a JSON response object, which contains response, command and player elements.
      */
-    private void processResponse(Chat.Response r){
+    private void processResponse(Chat.Response r, Chat.Listener partner){
         String response = r.text;
         String playerName = r.player;
         String action = r.action;
@@ -435,11 +435,15 @@ public class GeminiNPCTrait extends Trait {
             Plugin.log("null msg");
         }
         if (action != null && !action.isBlank()) {
-//            performAction(playerName==null?null:plugin.getServer().getPlayer(playerName), action);
-            plugin.actionRegistry.handleAction(this,
-                    playerName==null?null:plugin.getServer().getPlayer(playerName),
-                    action);
-            Plugin.log("ACTION HANDLING: "+action);
+            // A quest action applies to the player the request was for (the partner), not whoever the LLM
+            // names. Only if it isn't one of this NPC's quest actions is it tried as a built-in action.
+            String name = action.trim().split("\\s+", 2)[0];
+            if (!plugin.runQuestAction(npc, partner.id(), name)) {
+                plugin.actionRegistry.handleAction(this,
+                        playerName==null?null:plugin.getServer().getPlayer(playerName),
+                        action);
+                Plugin.log("ACTION HANDLING: "+action);
+            }
         }
     }
 
@@ -524,7 +528,7 @@ public class GeminiNPCTrait extends Trait {
             QueuedResponse q = queue.poll();
             // parse the response
             Plugin.log(npc.getName() +" (talking to " + q.partner().name() + ") returned: " + q.response());
-            processResponse(q.response());
+            processResponse(q.response(), q.partner());
         }
 
         updateNearbyEntities(NEARBY_ENTITIES_SCAN_DIST, NEARBY_ENTITIES_SCAN_DISTY);

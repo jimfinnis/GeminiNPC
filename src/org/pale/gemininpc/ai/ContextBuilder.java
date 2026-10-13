@@ -12,6 +12,7 @@ import org.bukkit.inventory.ItemStack;
 import org.pale.gemininpc.GeminiNPCTrait;
 import org.pale.gemininpc.Plugin;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
+import org.pale.gemininpc.quests.QuestRegistry;
 import org.pale.jcfutils.region.Region;
 import org.pale.jcfutils.region.RegionManager;
 
@@ -161,19 +162,29 @@ public class ContextBuilder {
         return root;
     }
 
-    /// Add the quest guidance for this NPC talking to the partner, as one value under "quest". It's always
-    /// there, as an empty array if there's none, because the context diff never reports a key being
-    /// removed: replacing the whole value is how the model learns that earlier guidance no longer applies.
+    /// Add the quest guidance and actions for this NPC talking to the partner, as "quest" and "quest-actions".
+    /// Both are always there, as empty arrays if there are none, because the context diff never reports a
+    /// key being removed: replacing the whole value is how the model learns that something no longer applies.
     private void appendQuest(JsonObject root, UUID partner) {
         JsonArray quest = new JsonArray();
+        JsonArray actions = new JsonArray();
         try {
             for (String prompt : plugin.getQuests().promptsFor(npc.getId(), partner))
                 quest.add(prompt);
+            // the quest actions the NPC can take now; an array rather than an object, so that a changed
+            // list is always sent whole (the diff of an object would never report an action going away)
+            for (QuestRegistry.OfferedAction a : plugin.getQuests().actionsFor(npc.getId(), partner)) {
+                JsonObject o = new JsonObject();
+                o.addProperty("action", a.name());
+                o.addProperty("description", a.desc());
+                actions.add(o);
+            }
         } catch (RuntimeException e) {
             // e.g. a condition that fails at runtime; better no guidance than no reply
             plugin.getLogger().log(Level.WARNING, "Error getting quest prompts for " + npc.getName(), e);
         }
         root.add("quest", quest);
+        root.add("quest-actions", actions);
     }
 
 

@@ -8,7 +8,8 @@
     "No explanation before or after the JSON.",
     "You are allowed to perform actions listed in the 'actions' section.",
     "If the user requests an action, you MUST output the appropriate action.",
-    "The 'quest' field of the context is guidance about stories you are part of, as they stand now. Follow it, and treat anything it tells you as true. Each new 'quest' value replaces the previous one entirely; when it is empty, no quest guidance applies."
+    "The 'quest' field of the context is guidance about stories you are part of, as they stand now. Follow it, and treat anything it tells you as true. Each new 'quest' value replaces the previous one entirely; when it is empty, no quest guidance applies.",
+    "The 'quest-actions' field of the context lists extra actions you can take now, as well as those in 'actions'. They record important story events. If your reply does what one of them describes, you MUST put that action's name in the action field of the same reply. Never do the action without the event, or the event without the action. Each new 'quest-actions' value replaces the previous one entirely; when it is empty, there are none."
   ],
 
   "response_schema": {

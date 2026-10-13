@@ -51,6 +51,9 @@ class NPCQuestCondition {
         for(String name: as.getKeys(false)){
             String actionWhere = "actions." + name;
             QuestException.in(actionWhere, () -> {
+                // the LLM names an action as the first word of its reply's action field
+                if(name.isBlank() || name.chars().anyMatch(Character::isWhitespace))
+                    throw new QuestException("an action's name must be a single word");
                 ConfigurationSection a = as.getConfigurationSection(name);
                 if(a==null)
                     throw new QuestException("must contain desc: and do:");

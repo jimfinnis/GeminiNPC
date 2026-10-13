@@ -1,6 +1,9 @@
 package org.pale.gemininpc.quests;
 
+import net.citizensnpcs.api.npc.NPC;
 import org.bukkit.entity.Player;
+import org.pale.gemininpc.quests.actions.ActionContext;
+import org.pale.gemininpc.quests.actions.ActionList;
 import org.pale.gemininpc.quests.triggers.TriggerEvent;
 
 import java.util.*;
@@ -111,6 +114,92 @@ public class QuestRegistry {
             }
         }
         return prompts;
+    }
+
+    /// A quest action an NPC can do now.
+    public record OfferedAction(Quest quest, String name, String desc, ActionList actions) {}
+
+    /// The quest actions an NPC can do now, talking to a player: those of every condition whose `when` is
+    /// true, for the participant entries that are this NPC, in quests active for the player. Unlike prompts,
+    /// complete quests don't count, since their state is finished with.
+    /// @param player who the NPC is talking to; if null, only world quests count
+    public List<OfferedAction> actionsFor(int npcId, UUID player){
+        List<OfferedAction> offered = new ArrayList<>();
+        for(Quest q: quests.values()){
+            if((player==null && q.player_only) || !isActive(q, player))
+                continue;
+            for(var e: q.npcData.entrySet()){
+                if(!QuestNPCs.matches(npcId, e.getKey()))
+                    continue;
+                Instance inst = states.getOrCreate(q, player);
+                for(NPCQuestCondition c: e.getValue().conditions){
+                    if(!c.actions.isEmpty() && inst.test(c.when)){
+                        for(NPCQuestCondition.Action a: c.actions.values())
+                            offered.add(new OfferedAction(q, a.name(), a.desc(), a.actions()));
+                    }
+                }
+            }
+        }
+        return offered;
+    }
+
+    /// What happened when the LLM named an action.
+    public enum ActionOutcome {
+        RAN,                // a quest action offered now, which has been run
+        NOT_OFFERED,        // one of this NPC's quest actions, but not offered now, so ignored
+        NOT_QUEST_ACTION    // not a quest action for this NPC; it may be a built-in action
+    }
+
+    /// Run a quest action the LLM has chosen, if it's offered now; it's checked again here because the reply
+    /// can arrive some time after the request that offered it. The actions run on the player's state, then
+    /// the quest is checked for completion. `log` gets a description of what happened.
+    /// @param npc the NPC, for actions that need it; may be null
+    /// @param playerObj the player, for actions that need it; may be null (e.g. if they've logged out)
+    public ActionOutcome runNPCAction(int npcId, NPC npc, UUID player, Player playerObj, String name,
+                                      List<String> log){
+        for(OfferedAction a: actionsFor(npcId, player)){
+            if(a.name().equals(name)){
+                Instance inst = states.getOrCreate(a.quest(), player);
+                a.actions().run(new ActionContext(inst, playerObj, npc, null));
+                log.add(a.quest().id + " action " + name);
+                if(checkCompletion(a.quest(), inst))
+                    log.add(a.quest().id + " completed");
+                return ActionOutcome.RAN;
+            }
+        }
+        // is it one of this NPC's quest actions at all?
+        for(Quest q: quests.values()){
+            for(var e: q.npcData.entrySet()){
+                if(!QuestNPCs.matches(npcId, e.getKey()))
+                    continue;
+                for(NPCQuestCondition c: e.getValue().conditions){
+                    if(c.actions.containsKey(name)){
+                        log.add(q.id + " action " + name + " isn't offered now, so it was ignored");
+                        return ActionOutcome.NOT_OFFERED;
+                    }
+                }
+            }
+        }
+        return ActionOutcome.NOT_QUEST_ACTION;
+    }
+
+    /// Warn about quest actions with the same name as a built-in action. While the quest action is offered
+    /// it's the one used, but the LLM sees both, which is confusing. Returns warnings, each starting with the
+    /// quest file's name.
+    public List<String> checkActionNames(Collection<String> builtIn){
+        List<String> warnings = new ArrayList<>();
+        for(Quest q: quests.values()){
+            for(var e: q.npcData.entrySet()){
+                for(NPCQuestCondition c: e.getValue().conditions){
+                    for(String name: c.actions.keySet()){
+                        if(builtIn.contains(name))
+                            warnings.add(files.get(q.id) + ": participants." + e.getKey() + ": action \"" + name
+                                    + "\" has the same name as a built-in action; rename it");
+                    }
+                }
+            }
+        }
+        return warnings;
     }
 
     /// Check whether a quest has just been completed, after its facts have changed, and mark it complete if

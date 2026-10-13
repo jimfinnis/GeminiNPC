@@ -60,6 +60,11 @@ public class ActionRegistry  {
         }
     }
 
+    /// The names of all the built-in actions, so that quest actions can be checked for clashes.
+    public Set<String> names(){
+        return Collections.unmodifiableSet(allActions.keySet());
+    }
+
     public void handleAction(GeminiNPCTrait t, Player target, String action){
         // extract the first word from the action string
         var out = action.split("\\s+", 2);

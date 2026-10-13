@@ -330,6 +330,7 @@ Most of what the context contains is obvious, but here are some notes:
 * `region` is information from the JCFUtils plugin's region mechanism - it gives the region name and description (if there is one).
 * `current-state` is set from the current state template as described above. It is calculated immediately before any request is sent to the AI.
 * `quest` is a list of guidance from the quests the NPC is part of, for the player it's talking to: the `prompt` of every quest condition that's currently true for this NPC. It's always present (an empty list when there's no guidance), and a new value replaces the old one entirely, which the `common` template tells the model.
+* `quest-actions` lists the quest actions the NPC can take now, for that player, each with its name and description; likewise always present. When the model puts one of these names in its reply's action field, the action is checked again (the reply may arrive a while later) and run on that player's quest state. A quest action that isn't offered at that moment is ignored rather than treated as a built-in action.
 
 
 ## Waypoints

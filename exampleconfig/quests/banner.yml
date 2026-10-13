@@ -46,6 +46,11 @@ triggers:
 # learns that Angren is Lofgar once the player knows the name). An NPC can be
 # told that it has a secret without being told what it is, as Helga is at
 # first; it can't give away what it doesn't know.
+#
+# A fact records what the player has done, often somewhere the NPC wasn't
+# (e.g. knows_lofgar: they read Helga's diary). So don't tell the NPC what the
+# player did; tell it what it knows, and how to react if the player shows they
+# know it ("If the player tells you..."). Otherwise the NPC magically knows.
 participants:
   ladychanter:
     - when: not banner_recovered
@@ -56,13 +61,15 @@ participants:
         hung it; suggest they ask Doctor Prunesquallor's opinion.
     - when: helga_exposed and not knows_lofgar
       prompt: >-
-        You've learned that Helga hung the banner. You suspect there's more to
-        it. Helga keeps a chest in her room; ask the player to look in it.
+        The player may have found out who hung the banner. If they tell you it
+        was Helga, you're shocked, but you suspect there's more to it. Helga
+        keeps a chest in her room; ask the player to look in it.
     - when: knows_lofgar and not lofgar_revealed
       prompt: >-
-        The player has learned from Helga's diary that her father is a pillager
-        called Lofgar. You'll help her however you can; suggest the player asks
-        Doctor Prunesquallor, who knows everyone's history.
+        Helga's diary, in the chest in her room, says that her father is a
+        pillager called Lofgar. If the player tells you this, you'll help Helga
+        however you can; suggest they ask Doctor Prunesquallor, who knows
+        everyone's history.
   helga:
     - when: not helga_confessed
       prompt: >-
@@ -81,18 +88,19 @@ participants:
         you're asked.
     - when: knows_lofgar
       prompt: >-
-        The player has read your diary, so they know your secret: a book left
-        behind by the pillagers after their latest raid told you that your
-        father is a pillager called Lofgar, and you hung the banner hoping to
-        draw the pillagers back, and him with them. You're contrite about
-        endangering the convent, and desperate to find him.
+        Your reason, which you wrote in your diary: a book left behind by the
+        pillagers after their latest raid told you that your father is a
+        pillager called Lofgar, and you hung the banner hoping to draw the
+        pillagers back, and him with them. If the player shows they know about
+        your father, stop hiding it: you're contrite about endangering the
+        convent, and desperate to find him.
   prune:
     - when: banner_recovered
       prompt: >-
         Some nights ago you saw Helga, one of the nuns, by the convent walls
         late at night with something rolled up under her arm; you thought little
-        of it. The player has recovered an ominous banner from those walls. If
-        asked about it, you realise it may be what you saw Helga carrying.
+        of it. If the player tells you about an ominous banner found on those
+        walls, you realise it may be what you saw Helga carrying.
       actions:
         tell_about_helga:
           desc: "You tell the player you saw Helga by the walls at night with something rolled up"
