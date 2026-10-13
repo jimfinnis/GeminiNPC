@@ -861,10 +861,13 @@ public class Plugin extends JavaPlugin implements Listener {
         t.plugin.getLogger().info(t.getSystemInstructions());
     }
 
-    @Cmd(desc="show NPC's context object on console", cz=true, argc=0)
+    @Cmd(desc="show NPC's context object on console, as if talking to you", cz=true, argc=0)
     public void context(CallInfo c){
         GeminiNPCTrait t = c.getCitizen();
-        JsonObject o = t.getContextBuilder().getContext();
+        // the quest guidance depends on who the NPC is talking to; from the console, there's no player,
+        // so only world quests count
+        Player p = c.getPlayer();
+        JsonObject o = t.getContextBuilder().getContext(p==null ? null : p.getUniqueId());
         t.plugin.getLogger().info(o.toString());
     }
 

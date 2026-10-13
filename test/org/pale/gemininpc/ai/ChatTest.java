@@ -23,9 +23,14 @@ public class ChatTest {
     /// Stands in for the LLM: records the messages of each request, and replies with fixed JSON.
     static class FakeModel implements ChatModel {
         final List<List<ChatMessage>> requests = new ArrayList<>();
+        boolean failNext = false;   // set to make the next call fail, as a timeout would
 
         @Override
         public ChatResponse doChat(ChatRequest request) {
+            if (failNext) {
+                failNext = false;
+                throw new RuntimeException("timed out");
+            }
             requests.add(List.copyOf(request.messages()));
             return ChatResponse.builder()
                     .aiMessage(AiMessage.from("{\"player\":\"someone\",\"text\":\"reply " + requests.size()
@@ -88,6 +93,17 @@ public class ChatTest {
         // Bob hasn't seen any context yet, so he gets all of it
         chat.respond(new Chat.Request(bob, context("10:00", null), "Bob: hello", List.of()));
         assertTrue(text(model.requests.getLast().getLast()).contains("\"time\":\"10:00\""));
+    }
+
+    @Test
+    void contextIsResentAfterAFailedCall() {
+        chat.respond(new Chat.Request(alice, context("10:00", null), "Alice: one", List.of()));
+        model.failNext = true;
+        assertThrows(RuntimeException.class, () ->
+                chat.respond(new Chat.Request(alice, context("10:00", "new guidance"), "Alice: two", List.of())));
+        chat.respond(new Chat.Request(alice, context("10:00", "new guidance"), "Alice: three", List.of()));
+        String last = text(model.requests.getLast().getLast());
+        assertTrue(last.contains("new guidance"), last);
     }
 
     @Test

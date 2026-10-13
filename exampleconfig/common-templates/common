@@ -7,7 +7,8 @@
     "No trailing commas.",
     "No explanation before or after the JSON.",
     "You are allowed to perform actions listed in the 'actions' section.",
-    "If the user requests an action, you MUST output the appropriate action."
+    "If the user requests an action, you MUST output the appropriate action.",
+    "The 'quest' field of the context is guidance about stories you are part of, as they stand now. Follow it, and treat anything it tells you as true. Each new 'quest' value replaces the previous one entirely; when it is empty, no quest guidance applies."
   ],
 
   "response_schema": {

@@ -124,11 +124,13 @@ public class Chat {
         synchronized (c) {
             JsonObject msg = new JsonObject();
             msg.add("context", getDifferences(c.prevContext, req.context()));
-            c.prevContext = req.context();
             msg.addProperty("input", req.input());
             String outString = msg.toString();
             Plugin.log("Sending to AI (talking to " + req.partner().name() + "): " + outString);
             r = c.responder.respond(outString);
+            // Only count the context as seen once there's a reply. If the call fails (e.g. times out), the
+            // model may never have seen it, so the changes are sent again next time rather than lost.
+            c.prevContext = req.context();
         }
         if(r!=null) {
             // Those in earshot hear what was said and the reply, but not the context or any action: the

@@ -190,7 +190,15 @@ throw.
           to each NPC within 5 blocks that the player is roughly facing, so a message meant for
           one NPC gets replies from several. Possible fix: decide who it's addressed to (the
           closest NPC being faced, or one named in the message); the others only overhear it.
-    - [ ] 2. The `quest` prompt block, its template line, and tests.
+    - [x] 2. The `quest` prompt block, its template line, and tests. Done:
+          `QuestRegistry.promptsFor(npcId, player)` (tested in `QuestPromptsTest`),
+          `ContextBuilder.getContext(partner)` adds it as `"quest": [...]`, and a rule in the
+          `common` template explains it. Prompts come from quests that are active or complete
+          for the player (only quests not yet started give nothing), so that a stage reached
+          by the fact that completes a quest (Lofgar's, in `banner.yml`) still gets its
+          prompt. Tested in game: after the banner is given, the Lady Chanter's guidance
+          changes and Prunesquallor tells what he saw. `/gemini context` shows the context as
+          if the NPC were talking to you.
     - [ ] 3. Offering quest actions and dispatching them to the partner's state, then saving.
 - [ ] **Rumours.** When a fact with rumours becomes true, add each rumour's text to the context
       of the NPCs in `spreads-to`. The names there can be single NPCs or groups such as `[nuns]`,

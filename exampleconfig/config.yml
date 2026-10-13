@@ -9,6 +9,8 @@ main:
 model:
     apikey: Put your key here
     model: gemini-3-flash-preview
+    # seconds to wait for a reply before giving up (default 10); preview models can be slow
+    timeout: 30
 
 
 

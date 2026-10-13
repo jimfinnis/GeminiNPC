@@ -728,7 +728,7 @@ public class GeminiNPCTrait extends Trait {
             String input = (player==null) ? "event: "+utterance
                     : ChatColor.stripColor(player.getDisplayName()) + ": " + utterance;
             // the context reads the world, so build it here on the main thread, not in the request's thread
-            Chat.Request request = new Chat.Request(partner, getContextBuilder().getContext(), input, earshot);
+            Chat.Request request = new Chat.Request(partner, getContextBuilder().getContext(partner.id()), input, earshot);
             final Chat c = chat;    // in case the chat is reset while the request is running
 
             // start a new thread which sends to the AI and waits for the result

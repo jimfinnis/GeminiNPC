@@ -319,7 +319,9 @@ string the model should respond to, the former is a JSON-like string that looks 
 }
 ```
 It's worth noting that only parts of the context that have changed since the last turn are sent. So quite often
-the context will be empty or just contain the time.
+the context will be empty or just contain the time. Each NPC keeps a separate conversation for each player it
+talks to, and the changes are worked out for each conversation, so a player's first exchange with an NPC gets
+the whole context.
 
 Most of what the context contains is obvious, but here are some notes:
 
@@ -327,6 +329,7 @@ Most of what the context contains is obvious, but here are some notes:
 * `location description` is a description of the waypoint.
 * `region` is information from the JCFUtils plugin's region mechanism - it gives the region name and description (if there is one).
 * `current-state` is set from the current state template as described above. It is calculated immediately before any request is sent to the AI.
+* `quest` is a list of guidance from the quests the NPC is part of, for the player it's talking to: the `prompt` of every quest condition that's currently true for this NPC. It's always present (an empty list when there's no guidance), and a new value replaces the old one entirely, which the `common` template tells the model.
 
 
 ## Waypoints

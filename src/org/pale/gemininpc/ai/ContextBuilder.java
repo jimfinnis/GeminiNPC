@@ -18,6 +18,8 @@ import org.pale.jcfutils.region.RegionManager;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
+import java.util.logging.Level;
 import java.util.stream.Collectors;
 
 
@@ -43,9 +45,10 @@ public class ContextBuilder {
         this.plugin = trait.plugin;
     }
 
-    /// The full context for the NPC as it is now. Call this on the main thread, since it reads the world;
-    /// `Chat` works out what has changed since each conversation last saw it.
-    public JsonObject getContext() {
+    /// The full context for the NPC as it is now, talking to `partner`. Call this on the main thread,
+    /// since it reads the world and the quest state; `Chat` works out what has changed since each
+    /// conversation last saw it.
+    public JsonObject getContext(UUID partner) {
         Location loc = npc.getStoredLocation();
         World w = Objects.requireNonNull(loc.getWorld());
 
@@ -153,7 +156,24 @@ public class ContextBuilder {
             String s = p.getCurrentState(trait);
             root.addProperty("current-state", (s == null) ? "normal" : s);
         }
+
+        appendQuest(root, partner);
         return root;
+    }
+
+    /// Add the quest guidance for this NPC talking to the partner, as one value under "quest". It's always
+    /// there, as an empty array if there's none, because the context diff never reports a key being
+    /// removed: replacing the whole value is how the model learns that earlier guidance no longer applies.
+    private void appendQuest(JsonObject root, UUID partner) {
+        JsonArray quest = new JsonArray();
+        try {
+            for (String prompt : plugin.getQuests().promptsFor(npc.getId(), partner))
+                quest.add(prompt);
+        } catch (RuntimeException e) {
+            // e.g. a condition that fails at runtime; better no guidance than no reply
+            plugin.getLogger().log(Level.WARNING, "Error getting quest prompts for " + npc.getName(), e);
+        }
+        root.add("quest", quest);
     }
 
 

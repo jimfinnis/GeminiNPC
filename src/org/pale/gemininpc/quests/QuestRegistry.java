@@ -82,6 +82,37 @@ public class QuestRegistry {
         return quests.values().stream().filter(q -> isActive(q, player)).toList();
     }
 
+    /// The quest prompts for an NPC talking to a player: the `prompt` of every condition whose `when` is
+    /// true, for the participant entries that are this NPC (names matched with `QuestNPCs`), in the order
+    /// the quests were loaded and the conditions are in their files.
+    ///
+    /// Quests which are active or complete for the player both count; only quests which haven't started
+    /// give nothing. Complete quests count so that a stage reached by the very fact that completes the
+    /// quest (e.g. Lofgar once he's revealed, in the example) still gets its prompt, and so that NPCs go on
+    /// knowing how a quest ended.
+    /// @param npcId the Citizens ID of the NPC
+    /// @param player who the NPC is talking to; world quests use the world's state whoever it is. If null
+    ///               (no player, e.g. from the console), only world quests give prompts.
+    public List<String> promptsFor(int npcId, UUID player){
+        List<String> prompts = new ArrayList<>();
+        for(Quest q: quests.values()){
+            if(player==null && q.player_only)
+                continue;   // a player quest's state needs a player; null is where world state is kept
+            if(!isActive(q, player) && !isComplete(q, player))
+                continue;
+            for(var e: q.npcData.entrySet()){
+                if(!QuestNPCs.matches(npcId, e.getKey()))
+                    continue;
+                Instance inst = states.getOrCreate(q, player);
+                for(NPCQuestCondition c: e.getValue().conditions){
+                    if(c.prompt!=null && inst.test(c.when))
+                        prompts.add(c.prompt);
+                }
+            }
+        }
+        return prompts;
+    }
+
     /// Check whether a quest has just been completed, after its facts have changed, and mark it complete if
     /// so. Returns true if it has. Quests which require it become active as a result.
     /// Later, this is where `on-complete` will run.
