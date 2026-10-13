@@ -153,6 +153,7 @@ public class Plugin extends JavaPlugin implements Listener {
 
         // register the commands automatically - these are tagged with @Cmd.
         commandRegistry.register(this); // register commands
+        commandRegistry.register(new QuestCommands(this));  // the /gemini quest commands
 
         // register the Actions similarly
         actionRegistry.register(new Actions(this));

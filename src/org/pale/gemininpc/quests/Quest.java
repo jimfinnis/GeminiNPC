@@ -32,7 +32,7 @@ public class Quest {
      * Set of facts - these are essentially booleans which the system can set or clear. Some facts, however,
      * spread to other sets of NPCs as "rumours"
      */
-    Map<String, Fact> facts = new HashMap<>();
+    Map<String, Fact> facts = new LinkedHashMap<>();   // in the order they are in the file
 
     /**
      * Deterministic (non-LLM) events that can trigger state changes, in the order they're in the file

@@ -83,6 +83,13 @@ bland default persona.
 * `/gemini dumpmem` - dump NPC's memory to console
 * `/gemini prompt` - show system prompt on console
 
+### Quests (for testing)
+
+* `/gemini quest list` - list the loaded quests, with their scope and what they require
+* `/gemini quest state [<player>]` - show each quest's status for a player (yourself if no player is given): complete, active, or waiting for the quests it requires, with the values of its facts
+* `/gemini quest set <player> <quest> <fact> true|false` - set a fact, which may complete the quest. It works on quests that aren't active yet, to set up a test, but setting a fact back to false doesn't undo completion
+* `/gemini quest reset <player> [<quest>]` - start a quest again for a player. Naming a world quest resets it for everyone; with no quest named, all the player's own quests are reset but world quests are left alone
+
 ### Waypoint management
 
 * `/gemini wp <name> <description>..` - set a waypoint for the selected NPC at your current location

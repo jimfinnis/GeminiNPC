@@ -175,8 +175,13 @@ throw.
   - [ ] Gives only happen for NPCs with the GeminiNPC trait (the right-click handler ignores
         others), but `QuestRegistry.checkNPCs` allows `give ... to` any NPC. Make the check
         require the trait, or make gives to other NPCs work.
-- [ ] **Commands for debugging**, e.g. `/gemini quest list`, `/gemini quest state PLAYER`,
-      `/gemini quest set PLAYER QUEST FACT true|false` and `/gemini quest reset`.
+- [x] **Commands for debugging**: `/gemini quest list`, `state [PLAYER]`,
+      `set PLAYER QUEST FACT true|false` and `reset PLAYER [QUEST]` (documented in the README).
+      The logic is in `QuestDebug`, which is tested; `commands/QuestCommands` finds the player,
+      online or offline, and prints the result.
+  - [x] Tested in game.
+  - [ ] Quest state isn't saved yet (see "Persistence"), so everything set here is lost on a
+        restart, though not on `/gemini reload`.
 
 ## NPC quest actions (`participants.<npc>[].actions`)
 
