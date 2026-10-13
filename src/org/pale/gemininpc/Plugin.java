@@ -88,11 +88,18 @@ public class Plugin extends JavaPlugin implements Listener {
     }
 
     public static void log(String msg) {
-        getInstance().getLogger().info(msg);
+        logger().info(msg);
     }
 
     public static void warn(String msg) {
-        getInstance().getLogger().warning(msg);
+        logger().warning(msg);
+    }
+
+    /// The plugin's logger, or a plain one when the plugin isn't running (in tests, or tools such as
+    /// TestPrompt), so that code which logs can still be used there.
+    private static java.util.logging.Logger logger() {
+        Plugin p = instance;
+        return p != null ? p.getLogger() : java.util.logging.Logger.getLogger("GeminiNPC");
     }
 
     @Override
@@ -842,7 +849,10 @@ public class Plugin extends JavaPlugin implements Listener {
     @Cmd(desc="dump memory to console", cz=true,argc=0)
     public void dumpmem(CallInfo c){
         GeminiNPCTrait t = c.getCitizen();
-        t.chat.dumpMem();
+        if(t.chat==null)
+            c.msg("That NPC hasn't talked to anyone yet");
+        else
+            t.chat.dumpMem();   // every conversation, one per player
     }
 
     @Cmd(desc="show system prompt on console", cz=true, argc=0)

@@ -1,6 +1,8 @@
 import dev.langchain4j.model.chat.request.ResponseFormat;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.googleai.GoogleAiGeminiChatModel;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import org.pale.gemininpc.ai.Chat;
 
 import java.io.BufferedReader;
@@ -14,13 +16,14 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Scanner;
+import java.util.UUID;
 
 /**
  * Test class that expects a fully expanded prompt (i.e. no templating done) in the file PROMPT_FILE.
  * The console will accept input from the user.
  * This input will be inserted into a template which mirrors that sent in the actual plugin.
- * The first time round the loop (i.e. on creation of a new session) PROMPT_TEMPLATE_FIRST will be used,
- * and PROMPT_TEMPLATE_NOT_FIRST thereafter.
+ * The context in PROMPT_TEMPLATE_FIRST is passed every time; Chat sends all of it on the first turn and
+ * only what has changed (nothing) after that, as it does in the plugin.
  */
 public class TestPrompt {
 
@@ -35,9 +38,6 @@ public class TestPrompt {
             "light from lamps":"10/15","world":"world","recently seen":"no monsters",
             "recently heard":"no monsters","combat":"833 minutes ago","guarding player":"nothing","health":"maximum","inventory":["BONE"]},
             "input":"jfinnis: INSERTTEXTHERE"}
-            """;
-    private static final String PROMPT_TEMPLATE_NOT_FIRST = """
-            {"context":{"time":"14:25"},"input:"jfinnis: INSERTTEXTHERE"}
             """;
 
     TestPrompt(){
@@ -121,21 +121,20 @@ public class TestPrompt {
     public static void main(String[] args){
         Scanner scanner = new Scanner(System.in);
         TestPrompt tp = new TestPrompt();
-        boolean first = true;
+        // Chat sends the whole context the first time and only what has changed after that, so the same
+        // context can be passed every time
+        JsonObject context = JsonParser.parseString(PROMPT_TEMPLATE_FIRST.replaceAll("\\n", ""))
+                .getAsJsonObject().getAsJsonObject("context");
+        Chat.Listener player = new Chat.Listener(UUID.nameUUIDFromBytes("jfinnis".getBytes()), "jfinnis");
         for(;;){
             System.out.print(">> ");
             String in = scanner.nextLine().trim();
             if(in.startsWith("reload")){
                 tp = new TestPrompt();
-                first = true;
                 continue;
             }
             if(in.isBlank())continue;
-            String tmp = first?PROMPT_TEMPLATE_FIRST:PROMPT_TEMPLATE_NOT_FIRST;
-            first = false;
-            in = tmp.replace("INSERTTEXTHERE", in).replaceAll("\\n","");
-            System.out.println(in);
-            Chat.Response r = tp.chat.sendAndGetResponse(in);
+            Chat.Response r = tp.chat.respond(new Chat.Request(player, context, "jfinnis: " + in, List.of()));
             System.out.println("Player:"+r.player);
             System.out.println("Text:"+wrapText(r.text, 100, Locale.ENGLISH));
             System.out.println("Action:"+r.action);

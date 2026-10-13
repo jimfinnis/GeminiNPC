@@ -162,10 +162,12 @@ public class GeminiNPCTrait extends Trait {
 
     // The "chat" part of the GenAI api is synchronous, so we use a queue and a thread to
     // make it non-blocking. Requests are sent to the AI in a thread, and when the response
-    // is returned it is added to this queue. We don't need to store the player, because the
-    // NPC will just "say" the response to all players in range. The queue is read inside the
+    // is returned it is added to this queue. The NPC "says" the response to all players in
+    // range; the queue also records the partner the request was made for, so that quest
+    // actions can apply to that player's state. The queue is read inside the
     // update method by polling - not ideal, but it's very quick and the update infrequent.
-    final ConcurrentLinkedQueue<Chat.Response> queue = new ConcurrentLinkedQueue<>();
+    record QueuedResponse(Chat.Response response, Chat.Listener partner) {}
+    final ConcurrentLinkedQueue<QueuedResponse> queue = new ConcurrentLinkedQueue<>();
 
     // this is the Chat API object - it's created the first time you call the respondTo method,
     // or when it's called after you change the persona (which sets this to zero)
@@ -519,10 +521,10 @@ public class GeminiNPCTrait extends Trait {
         checkPurchaseTimer();   // check if we have a purchase timer that has expired, and if so, send the purchases to the AI.
         // check the queue - if there are any messages, speak them.
         while (!queue.isEmpty()) {
-            Chat.Response r = queue.poll();
+            QueuedResponse q = queue.poll();
             // parse the response
-            Plugin.log(npc.getName() +" returned JSON string is: " + r.toString());
-            processResponse(r);
+            Plugin.log(npc.getName() +" (talking to " + q.partner().name() + ") returned: " + q.response());
+            processResponse(q.response());
         }
 
         updateNearbyEntities(NEARBY_ENTITIES_SCAN_DIST, NEARBY_ENTITIES_SCAN_DISTY);
@@ -696,7 +698,8 @@ public class GeminiNPCTrait extends Trait {
 
         // limit rate globally - across all chats!
         if(plugin.eventRateTracker.getEventsInLastMinute()>20){
-            Plugin.log("Rate limit exceeded, not responding to " + player.getDisplayName());
+            Plugin.log("Rate limit exceeded, not responding to "
+                    + (player==null ? "event: "+utterance : player.getDisplayName()));
             return;
         }
 
@@ -708,32 +711,39 @@ public class GeminiNPCTrait extends Trait {
         // look for nearby players, and only do something if there are some.
         // Are any players less than 12m away?
         if (nearbyPlayers.stream().anyMatch(p -> p.d < 12)) {
+            // Who the NPC is talking to: the player who spoke (or gave something, etc.), or if there's no
+            // real player behind this (an idle turn, an event, another NPC speaking), the nearest real player.
+            Player partnerPlayer = (player!=null && isRealPlayer(player)) ? player
+                    : nearbyPlayers.stream().filter(p -> isRealPlayer(p.p))
+                        .min(Comparator.comparingDouble(NearbyPlayer::d)).map(NearbyPlayer::p).orElse(null);
+            if(partnerPlayer==null)
+                return;     // no real players nearby, only NPCs
+            Chat.Listener partner = listener(partnerPlayer);
+            // the other real players in range hear the exchange too
+            List<Chat.Listener> earshot = nearbyPlayers.stream()
+                    .map(NearbyPlayer::p)
+                    .filter(p -> isRealPlayer(p) && !p.getUniqueId().equals(partnerPlayer.getUniqueId()))
+                    .map(GeminiNPCTrait::listener).toList();
+
+            String input = (player==null) ? "event: "+utterance
+                    : ChatColor.stripColor(player.getDisplayName()) + ": " + utterance;
+            // the context reads the world, so build it here on the main thread, not in the request's thread
+            Chat.Request request = new Chat.Request(partner, getContextBuilder().getContext(), input, earshot);
+            final Chat c = chat;    // in case the chat is reset while the request is running
+
             // start a new thread which sends to the AI and waits for the result
             new Thread(() -> {
                 plugin.eventRateTracker.event();
-                String input;
-                if(player==null){
-                    input = "event: "+utterance;
-                } else {
-                    input = ChatColor.stripColor(player.getDisplayName()) + ": " + utterance;
-                }
-                JsonObject output = new JsonObject();
-
-                output.add("context", getContextBuilder().getContextDiffs());
-                output.add("input", new JsonPrimitive(input));
-
-                String outString = output.toString();
-                plugin.getServer().getLogger().info("Sending to AI: " + outString);
                 plugin.request_count++;
                 // here we get the response
                 try {
-                    Chat.Response response = chat.sendAndGetResponse(outString);
+                    Chat.Response response = c.respond(request);
                     if (response == null) {
                         plugin.getServer().getLogger().severe("No response");
                         return;
                     }
                     // otherwise we're all good. Queue the message.
-                    queue.offer(response);
+                    queue.offer(new QueuedResponse(response, partner));
                     plugin.getServer().getLogger().info("Response received: "+ response);
 
                 } catch(Exception e){
@@ -744,6 +754,15 @@ public class GeminiNPCTrait extends Trait {
                 }
             }).start();
         }
+    }
+
+    /// True if the player is a real player rather than a Citizens NPC (which can also be a Player entity).
+    private static boolean isRealPlayer(Player p){
+        return !CitizensAPI.getNPCRegistry().isNPC(p);
+    }
+
+    private static Chat.Listener listener(Player p){
+        return new Chat.Listener(p.getUniqueId(), ChatColor.stripColor(p.getDisplayName()));
     }
 
     private void processGreet() {

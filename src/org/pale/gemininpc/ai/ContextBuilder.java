@@ -1,7 +1,6 @@
 package org.pale.gemininpc.ai;
 
 import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import net.citizensnpcs.api.npc.NPC;
 import org.bukkit.*;
@@ -21,7 +20,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static org.pale.gemininpc.utils.Json.getDifferences;
 
 /**
  * This builds a JSON object - the context-  that is sent with every message to an NPC.
@@ -45,6 +43,8 @@ public class ContextBuilder {
         this.plugin = trait.plugin;
     }
 
+    /// The full context for the NPC as it is now. Call this on the main thread, since it reads the world;
+    /// `Chat` works out what has changed since each conversation last saw it.
     public JsonObject getContext() {
         Location loc = npc.getStoredLocation();
         World w = Objects.requireNonNull(loc.getWorld());
@@ -156,13 +156,6 @@ public class ContextBuilder {
         return root;
     }
 
-    public JsonElement getContextDiffs(){
-        JsonObject root = getContext();
-        // we only send the differences!
-        JsonObject diffs = getDifferences(prevContext,root);
-        prevContext = root;
-        return diffs;
-    }
 
     /**
      * Add the inventory as a JSON array to a JsonObject, if we are carrying anything
@@ -238,8 +231,6 @@ public class ContextBuilder {
             }
         }
     }
-
-    JsonObject prevContext = null;
 
     private static Set<Biome> biomesFromStrings(List<String> s) {
         return s.stream()

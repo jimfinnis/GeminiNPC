@@ -147,21 +147,51 @@ throw.
       instance's facts; it's true if the result is a nonzero integer.
   - [ ] An expression that type-checks badly at runtime (e.g. `"x" and f`) throws. Nothing
         catches this yet; the plugin should catch it where it calls `fire` and log it.
-- [ ] **Adding prompts.** For each NPC/player pair the NPC talks to, find the active quests where
-      the NPC is a participant and collect the `prompt` of every `when` that's true.
-  - Decide where this goes: the system instruction is rendered only once per chat, so quest
-    text must go in the per-turn context, probably through `ContextBuilder`, so that changes
-    show up through the existing context-diff mechanism.
-  - The context goes per NPC, but quest state is per player, so it depends on who the NPC is
-    talking to. Think about what happens when several players are nearby.
-- [ ] **NPC chat memory is shared between players.** Each NPC has one chat history
-      (`MessageWindowChatMemory` in `Chat`), but quest state is per player. Once Prunesquallor
-      has told player A that Angren is Lofgar, it's in his history, and he may tell player B,
-      who hasn't reached that stage. Keeping secrets out of personae (see the comment in
-      `banner.yml`) doesn't help here. Decide before adding prompts. Options:
-  - clear or trim an NPC's memory when it switches to talking to a different player;
-  - keep a separate memory per player for NPCs that are quest participants;
-  - accept it for `scope: world` quests, whose state is shared anyway.
+- [ ] **Conversations, memory and quest prompts.** Agreed design (2026-10-13):
+  - **Each conversation has one partner:** the player who spoke, gave the item and so on.
+    If there's no player (idle turns, events, another NPC speaking), the partner is the
+    nearest real player within earshot. Quest state, memory and quest actions all use the
+    partner's.
+  - **Memory per partner, shared with anyone in earshot.** Each NPC keeps a separate chat
+    memory for each player, each starting with the same system message. After each
+    exchange, the same lines (the speaker's words and the NPC's reply, without the context
+    or any action) are added to the memory of every other real player within earshot. So a
+    player's memory of an NPC holds what they actually heard, and a secret told to Alice
+    can't later reach Bob unless he was there. Memories are dropped after 30 minutes without
+    talking to that NPC, with at most 20 per NPC (least recently used dropped first).
+  - **Context per partner, built on the main thread.** The context diff is tracked per
+    memory. The context is built on the main thread before the request's thread starts, so
+    it doesn't race with quest state changing on the main thread.
+  - **Quest prompts under one key in the context**, e.g. `"quest": ["...", "..."]`: the
+    `prompt` of every `when` that's true for this NPC (matched with `QuestNPCs`), from the
+    partner's active player quests and the active world quests, in file order. It's always
+    present, as one value, with an empty array for "no guidance now", because the context
+    diff never reports a key being removed: replacing the whole value is how the model learns
+    that earlier guidance no longer applies. The `common` template gets a line explaining
+    it. The work goes in a plugin-free method, e.g. `QuestRegistry.promptsFor`.
+  - **Replies remember who they were for:** the reply queue records the partner, and quest
+    actions apply to that partner's state, not to the name the LLM puts in `player`.
+  - Stages:
+    - [ ] 1. Partners, per-partner memory and context, earshot sharing, and building the
+          context on the main thread. No quest content. Done in `Chat` (with `ChatTest`, using
+          a fake model) and `GeminiNPCTrait.respondTo`; `/gemini dumpmem` shows every
+          conversation. Tested in game with one player. Still to do: test with two players
+          together (needs a second account or an offline-mode client on a local test
+          server, or a `/gemini sayas NAME MESSAGE` debug command, not written).
+  - Left for later (2026-10-13):
+    - [ ] **NPCs don't hear each other.** An NPC's reply goes only to nearby players (with
+          `sendMessage`, which fires no chat event) and its own memory, so other NPCs never
+          hear it. This was already so before stage 1. Possible fix: when an NPC speaks, give
+          each other GeminiNPC in earshot a note of what was said, in its conversation with each
+          real player who was also in earshot, held back and added to the front of the next
+          message in that conversation (`(you overheard: ...)`), so it costs no extra LLM call
+          and the memory keeps alternating between player and NPC turns.
+    - [ ] **A player's message goes to every NPC in range.** `Plugin.handleMessage` sends it
+          to each NPC within 5 blocks that the player is roughly facing, so a message meant for
+          one NPC gets replies from several. Possible fix: decide who it's addressed to (the
+          closest NPC being faced, or one named in the message); the others only overhear it.
+    - [ ] 2. The `quest` prompt block, its template line, and tests.
+    - [ ] 3. Offering quest actions and dispatching them to the partner's state, then saving.
 - [ ] **Rumours.** When a fact with rumours becomes true, add each rumour's text to the context
       of the NPCs in `spreads-to`. The names there can be single NPCs or groups such as `[nuns]`,
       so a group needs defining somewhere, perhaps in the persona or in config.
