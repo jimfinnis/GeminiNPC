@@ -39,6 +39,7 @@ import org.pale.gemininpc.quests.QuestException;
 import org.pale.gemininpc.quests.QuestNPCs;
 import org.pale.gemininpc.quests.QuestRegistry;
 import org.pale.gemininpc.quests.QuestStates;
+import org.pale.gemininpc.quests.triggers.TriggerEvent;
 import org.pale.gemininpc.waypoints.Waypoint;
 import org.pale.gemininpc.waypoints.Waypoints;
 
@@ -204,6 +205,22 @@ public class Plugin extends JavaPlugin implements Listener {
     /// Warn about NPC names in quests which don't match any NPC. This has to wait until Citizens has loaded
     /// its NPCs, so it's called when Citizens says it's ready (see `ChatEventListener`) and after a reload,
     /// rather than when the quests are loaded.
+    /// Tell the quests that something has happened (e.g. a player gave an NPC an item), firing any triggers
+    /// that match in the quests active for the player. Errors are logged rather than thrown, so that a bad
+    /// quest can't break the event handler which called this.
+    public void fireQuestEvent(Player p, TriggerEvent e) {
+        // e.g. "jfinnis read "Helga's Diary""
+        String what = p.getName() + " " + e.describe();
+        try {
+            log("Attempting to fire quest event: " + what);
+            List<String> fired = quests.fire(p, e);
+            if(!fired.isEmpty())
+                log("Quest event: " + what + " - fired " + String.join(", ", fired));
+        } catch (RuntimeException ex) {
+            getLogger().log(Level.WARNING, "Error handling quest event: " + what, ex);
+        }
+    }
+
     public void checkQuestNPCs() {
         for(String w: quests.checkNPCs(QuestNPCs.getDirectory().all()))
             warn("Quest file " + w);

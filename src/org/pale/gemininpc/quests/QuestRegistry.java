@@ -1,7 +1,6 @@
 package org.pale.gemininpc.quests;
 
 import org.bukkit.entity.Player;
-import org.pale.gemininpc.quests.triggers.Trigger;
 import org.pale.gemininpc.quests.triggers.TriggerEvent;
 
 import java.util.*;
@@ -94,11 +93,12 @@ public class QuestRegistry {
     }
 
     /// Run an event through the triggers of every quest active for the player, running the actions of any
-    /// that match, then check those quests for completion. Returns true if any trigger fired.
+    /// that match, then check those quests for completion. Returns what happened, for the log, e.g.
+    /// `["banner triggers #1", "banner completed"]`; empty if no trigger fired.
     ///
     /// The active quests are found before any triggers run, so a quest which only becomes active because
     /// this event completed another one doesn't also see the event.
-    public boolean fire(Player p, TriggerEvent e){
+    public List<String> fire(Player p, TriggerEvent e){
         UUID player = p.getUniqueId();
         Map<Quest, Instance> active = new LinkedHashMap<>();
         for(Quest q: quests.values()){
@@ -106,16 +106,19 @@ public class QuestRegistry {
             if(inst!=null)
                 active.put(q, inst);
         }
-        boolean fired = false;
+        List<String> fired = new ArrayList<>();
         for(var entry: active.entrySet()){
             Quest q = entry.getKey();
             Instance inst = entry.getValue();
             boolean changed = false;
-            for(Trigger t: q.triggers)
-                changed |= t.check(inst, p, e);
-            if(changed)
-                checkCompletion(q, inst);
-            fired |= changed;
+            for(int i=0; i<q.triggers.size(); i++){
+                if(q.triggers.get(i).check(inst, p, e)){
+                    fired.add(q.id + " triggers #" + (i+1));
+                    changed = true;
+                }
+            }
+            if(changed && checkCompletion(q, inst))
+                fired.add(q.id + " completed");
         }
         return fired;
     }

@@ -9,7 +9,6 @@ import net.citizensnpcs.trait.ShopTrait;
 import net.citizensnpcs.trait.shop.ItemAction;
 import net.citizensnpcs.trait.shop.NPCShopAction;
 import org.bukkit.ChatColor;
-import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Arrow;
 import org.bukkit.entity.Entity;
@@ -21,16 +20,14 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDeathEvent;
-import org.bukkit.event.inventory.InventoryEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
-import org.bukkit.event.player.PlayerEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerTakeLecternBookEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.LecternInventory;
 import org.bukkit.inventory.meta.BookMeta;
 import org.bukkit.inventory.meta.WritableBookMeta;
+import org.pale.gemininpc.quests.triggers.TriggerEvent;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -70,17 +67,6 @@ public final class ChatEventListener implements Listener {
         } else {
             plugin.handleMessage(e.getPlayer(), e.getMessage());
         }
-    }
-
-    int snarkctr= 0;
-    private void snark(Event e, String msg){
-        msg = "Snark "+snarkctr+"   event handler debug - "+msg;
-        if(e instanceof PlayerEvent pe)
-            pe.getPlayer().sendMessage(msg);
-        else if(e instanceof InventoryOpenEvent ie)
-            ie.getPlayer().sendMessage(msg);
-        Plugin.log(msg);
-        snarkctr++;
     }
 
     /**
@@ -131,14 +117,14 @@ public final class ChatEventListener implements Listener {
 
     /**
      * This actually handles the book reading, it's called from different event handlers because books
-     * can be read in different ways. This will probably use the book's display name, which the JCFUtils
-     * plugin can set with the /jcf dname command.
+     * can be read in different ways. Quests match a book by its display name (which the JCFUtils plugin
+     * can set with the /jcf dname command) or, for a signed book, its title.
      */
     private void bookRead(Player p, WritableBookMeta m){
-        Plugin.log("Player "+p.getName()+" read book "+m.getItemName());
-        Plugin.log("  Display name: "+m.getDisplayName());
-        if(m instanceof BookMeta finished_book)
-            Plugin.log("  Title: "+(finished_book.hasTitle()?finished_book.getTitle():"(untitled)"));
+        String displayName = m.hasDisplayName() ? m.getDisplayName() : null;
+        // only a written (signed) book has a title; a book and quill doesn't
+        String title = (m instanceof BookMeta book && book.hasTitle()) ? book.getTitle() : null;
+        plugin.fireQuestEvent(p, new TriggerEvent.ReadBook(displayName, title));
     }
 
     /**

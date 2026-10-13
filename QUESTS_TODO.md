@@ -36,10 +36,10 @@ throw.
       `Material`; it's a white banner with a particular pattern. Either match on the item's
       display name, lore or other item data, or document that `give` takes only a plain
       material name.
-  - [ ] Test in game that the ominous banner matches. The plan is to set its display name to
-        "Ominous Banner" (e.g. with `/jcf dname`), since the vanilla name is a translatable
-        component that `getItemName()` won't return as plain text. Matching the banner pattern
-        instead isn't worth the effort, but it does mean any item renamed in an anvil will match.
+  - [x] Tested in game: a banner with its display name set to "Ominous Banner" matches.
+        The vanilla name is a translatable component (`block.minecraft.ominous_banner`), so
+        the display name is needed. Matching the banner pattern instead isn't worth the effort,
+        but it does mean any item renamed in an anvil will match.
   - [x] Colour codes in the display name (`/jcf dname &6Ominous Banner`) no longer stop it
         matching: `GiveCondition` and `ReadBookCondition` strip them from both names.
 - [x] **`read-book` trigger condition.** `ReadBookCondition` (`read-book NAME`) matches a
@@ -47,8 +47,8 @@ throw.
       detects reading through `PlayerInteractEvent` (right-clicking a written book or book and
       quill in hand) and `InventoryOpenEvent` (opening a lectern), both of which call
       `bookRead`. Still to do:
-  - [ ] Join them up: `bookRead` only logs; it should fire a `TriggerEvent.ReadBook` (see
-        "Firing triggers" below).
+  - [x] Join them up: `bookRead` fires a `TriggerEvent.ReadBook` (see "Firing triggers"
+        below).
   - [x] `ReadBookCondition.check` calls `name.equalsIgnoreCase(...)` on the event's name, so a
         book with no display name will throw if `bookRead` passes null. Swap the comparison
         round or pass `""`.
@@ -56,7 +56,7 @@ throw.
   - [x] A written book's title also matches: `TriggerEvent.ReadBook` carries both the display
         name and the title (null for a book and quill), and either can match. `bookRead` will
         need to pass both when it's joined up.
-  - [ ] Remove the debug code: the `snark` helper (unused), the logging in `bookRead`, and the
+  - [x] Remove the debug code: the `snark` helper (unused), the logging in `bookRead`, and the
         unused imports (`Material`, `InventoryEvent`, `PlayerTakeLecternBookEvent`).
   - [x] The `read-book` parse error doesn't include the condition text; the `give` one does.
   - [ ] Test in game: books in either hand, sneak-clicking a block while holding a book, and
@@ -152,12 +152,29 @@ throw.
 - [ ] **Rumours.** When a fact with rumours becomes true, add each rumour's text to the context
       of the NPCs in `spreads-to`. The names there can be single NPCs or groups such as `[nuns]`,
       so a group needs defining somewhere, perhaps in the persona or in config.
-- [ ] **Firing triggers.** `QuestRegistry.fire(player, event)` runs an event through the
+- [x] **Firing triggers.** `QuestRegistry.fire(player, event)` runs an event through the
       triggers of every quest active for the player, then checks those quests for
       completion. Quests that become active because the event completed another one don't
-      see the same event. Still to do:
-  - Call `fire` from `ChatEventListener` on the matching Bukkit events: NPC right-click gives
-    for `give`, and `bookRead` for `read-book`.
+      see the same event. The plugin calls it through `Plugin.fireQuestEvent`, which logs
+      triggers that fire and catches errors:
+  - `give`: from `GeminiNPCTrait.give`, after the NPC has taken the item and before it's
+    asked to respond, so its reply can reflect the change. A give the NPC couldn't take
+    (no room, item returned) doesn't fire.
+  - `read-book`: from `ChatEventListener.bookRead`, with the book's display name and title.
+  - [x] Tested in game: giving the banner to the Lady Chanter fires its trigger.
+  - [x] Tested in game: reading "Helga's Diary" fires its trigger.
+    - Watch out for names set with `/jcf dname "Some Name"`: the quotes become part of the
+      name, and it then won't match `read-book "Some Name"`. Use `/jcf dname Some Name`, or
+      make JCFUtils strip the quotes.
+  - [ ] Check that both ways of reading a book fire the trigger: holding it, and opening it
+        on a lectern.
+  - [x] Shorter log lines: `TriggerEvent.describe()` gives e.g. `gave "Ominous Banner" to
+        "Lady Chanter"`, with names quoted so stray characters show, and `fire` returns what
+        fired, e.g. `banner triggers #1` and `banner completed`. Every event is also logged
+        as it's attempted, which may be too noisy once things work.
+  - [ ] Gives only happen for NPCs with the GeminiNPC trait (the right-click handler ignores
+        others), but `QuestRegistry.checkNPCs` allows `give ... to` any NPC. Make the check
+        require the trait, or make gives to other NPCs work.
 - [ ] **Commands for debugging**, e.g. `/gemini quest list`, `/gemini quest state PLAYER`,
       `/gemini quest set PLAYER QUEST FACT true|false` and `/gemini quest reset`.
 

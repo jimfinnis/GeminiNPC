@@ -38,6 +38,7 @@ import org.pale.gemininpc.utils.TemplateFunctions;
 import org.pale.gemininpc.utils.TransientNotification;
 import org.pale.gemininpc.utils.TransientNotificationMap;
 import org.pale.gemininpc.waypoints.Waypoint;
+import org.pale.gemininpc.quests.triggers.TriggerEvent;
 import org.pale.gemininpc.waypoints.Waypoints;
 import org.pale.jcfutils.region.Region;
 import org.pale.jcfutils.region.RegionManager;
@@ -354,6 +355,9 @@ public class GeminiNPCTrait extends Trait {
                 return;
             }
         }
+
+        // tell the quests, before the AI responds, so that its reply can reflect any change
+        Plugin.getInstance().fireQuestEvent(p, new TriggerEvent.Give(npc, playerStack));
 
         // and send the message to the AI
         respondTo(p, "(gives you " + playerStack.getType().name() + ")");

@@ -137,7 +137,7 @@ public class QuestStateTest {
 
     @Test
     void triggerSetsFact() {
-        assertTrue(reg.fire(alice, read("Book A")));
+        assertEquals(List.of("first triggers #1"), reg.fire(alice, read("Book A")));
         Instance inst = states.get(q("first"), id(alice));
         assertEquals(Value.TRUE, inst.get("a"));
         assertEquals(Value.FALSE, inst.get("b"));
@@ -146,13 +146,13 @@ public class QuestStateTest {
 
     @Test
     void unmatchedEventDoesNothing() {
-        assertFalse(reg.fire(alice, read("Some Other Book")));
+        assertEquals(List.of(), reg.fire(alice, read("Some Other Book")));
     }
 
     @Test
     void completingAQuestActivatesTheNext() {
         reg.fire(alice, read("Book A"));
-        reg.fire(alice, read("Book B"));
+        assertEquals(List.of("first triggers #2", "first completed"), reg.fire(alice, read("Book B")));
         assertTrue(reg.isComplete(q("first"), id(alice)));
         assertFalse(reg.isActive(q("first"), id(alice)));
         assertTrue(reg.isActive(q("second"), id(alice)));
@@ -162,7 +162,7 @@ public class QuestStateTest {
     @Test
     void triggersOfInactiveQuestsDontFire() {
         // "second" isn't active yet, so reading Book C does nothing
-        assertFalse(reg.fire(alice, read("Book C")));
+        assertEquals(List.of(), reg.fire(alice, read("Book C")));
         assertNull(states.get(q("second"), id(alice)));
     }
 
@@ -170,7 +170,7 @@ public class QuestStateTest {
     void triggersOfCompletedQuestsDontFire() {
         reg.fire(alice, read("Book A"));
         reg.fire(alice, read("Book B"));
-        assertFalse(reg.fire(alice, read("Book A")));
+        assertEquals(List.of(), reg.fire(alice, read("Book A")));
     }
 
     @Test
@@ -272,7 +272,7 @@ public class QuestStateTest {
         r.add(banner, "banner.yml");
         assertTrue(r.isActive(banner, id(alice)));
         // reading Helga's diary sets knows_lofgar
-        assertTrue(r.fire(alice, read("Helga's Diary")));
+        assertEquals(List.of("banner triggers #2"), r.fire(alice, read("Helga's Diary")));
         assertEquals(Value.TRUE, states.get(banner, id(alice)).get("knows_lofgar"));
     }
 }
