@@ -176,7 +176,8 @@ public class QuestLoadTest {
                 facts:
                   f: {}
                 triggers:
-                  - set: f
+                  - do:
+                      - set: f
                 """));
     }
 
@@ -187,9 +188,11 @@ public class QuestLoadTest {
                   f: {}
                 triggers:
                   - on: read-book x
-                    set: f
+                    do:
+                      - set: f
                   - on: dance with helga
-                    set: f
+                    do:
+                      - set: f
                 """);
         assertTrue(msg.startsWith("triggers #2: on: unknown condition type \"dance\""), msg);
     }
@@ -201,65 +204,155 @@ public class QuestLoadTest {
                   f: {}
                 triggers:
                   - on: read-book two words
-                    set: f
+                    do:
+                      - set: f
                 """);
         assertTrue(msg.startsWith("triggers #1: on: bad read-book condition"), msg);
     }
 
     @Test
-    void triggerSetsUnknownFact() {
-        assertEquals("triggers #1: set: there is no fact called \"g\"", fails(HEADER + """
+    void triggerWithoutActions() {
+        String msg = fails(HEADER + """
+                triggers:
+                  - on: read-book x
+                """);
+        assertTrue(msg.startsWith("triggers #1: no do: actions"), msg);
+    }
+
+    @Test
+    void triggerWithOldStyleSet() {
+        // set: directly on the trigger, as it used to be, rather than in a do: list
+        String msg = fails(HEADER + """
                 facts:
                   f: {}
                 triggers:
                   - on: read-book x
-                    set: g
-                """));
+                    set: f
+                """);
+        assertTrue(msg.startsWith("triggers #1: no do: actions"), msg);
+        assertEquals(List.of("triggers #1: unknown key \"set\" (ignored)"), warnings);
     }
 
+    // ---- action lists (do:), tested through triggers ----
+
     @Test
-    void triggerSetsListOfFacts() throws IOException {
+    void doSeveralActions() throws IOException {
         load(HEADER + """
                 facts:
                   f: {}
                   g: {}
+                  h: {}
                 triggers:
                   - on: read-book x
-                    set: [f, g]
+                    do:
+                      - set: f
+                      - set: [g, h]
                 """);
         assertEquals(List.of(), warnings);
     }
 
     @Test
-    void triggerSetsUnknownFactInList() {
-        assertEquals("triggers #1: set: there is no fact called \"h\"", fails(HEADER + """
+    void doMustBeList() {
+        String msg = fails(HEADER + """
+                facts:
+                  f: {}
+                triggers:
+                  - on: read-book x
+                    do:
+                      set: f
+                """);
+        assertTrue(msg.startsWith("triggers #1: do must be a list"), msg);
+    }
+
+    @Test
+    void doItemMustBeMap() {
+        String msg = fails(HEADER + """
+                facts:
+                  f: {}
+                triggers:
+                  - on: read-book x
+                    do:
+                      - set f
+                """);
+        assertTrue(msg.startsWith("triggers #1: do #1 must be a map"), msg);
+    }
+
+    @Test
+    void doMissingDash() {
+        // the second action has no "-", so the two are one item with two keys
+        String msg = fails(HEADER + """
+                facts:
+                  f: {}
+                triggers:
+                  - on: read-book x
+                    do:
+                      - set: f
+                        give: PAPER
+                """);
+        assertTrue(msg.startsWith("triggers #1: do #1 should be one action, but has [set, give]"), msg);
+        assertTrue(msg.contains("\"- \""), msg);
+    }
+
+    @Test
+    void doUnknownAction() {
+        assertEquals("triggers #1: do #2: unknown action \"dance\", should be set", fails(HEADER + """
+                facts:
+                  f: {}
+                triggers:
+                  - on: read-book x
+                    do:
+                      - set: f
+                      - dance: wildly
+                """));
+    }
+
+    @Test
+    void doSetUnknownFact() {
+        assertEquals("triggers #1: do #1: set: there is no fact called \"g\"", fails(HEADER + """
+                facts:
+                  f: {}
+                triggers:
+                  - on: read-book x
+                    do:
+                      - set: g
+                """));
+    }
+
+    @Test
+    void doSetUnknownFactInList() {
+        assertEquals("triggers #1: do #1: set: there is no fact called \"h\"", fails(HEADER + """
                 facts:
                   f: {}
                   g: {}
                 triggers:
                   - on: read-book x
-                    set: [f, h]
+                    do:
+                      - set: [f, h]
                 """));
     }
 
     @Test
-    void triggerSetsEmptyList() {
-        assertEquals("triggers #1: set: no facts given", fails(HEADER + """
+    void doSetEmptyList() {
+        assertEquals("triggers #1: do #1: set: no facts given", fails(HEADER + """
                 facts:
                   f: {}
                 triggers:
                   - on: read-book x
-                    set: []
+                    do:
+                      - set: []
                 """));
     }
 
     @Test
-    void triggerWithoutAction() {
-        String msg = fails(HEADER + """
+    void doSetMap() {
+        assertEquals("triggers #1: do #1: set: should be a fact or a list of facts, not a map", fails(HEADER + """
+                facts:
+                  f: {}
                 triggers:
                   - on: read-book x
-                """);
-        assertTrue(msg.startsWith("triggers #1: no action"), msg);
+                    do:
+                      - set: { f: true }
+                """));
     }
 
     // ---- participants ----

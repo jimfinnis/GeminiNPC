@@ -12,8 +12,13 @@ server's `quests` folder under the same name.
   against the quest's `facts`, as are the facts named in `set:`.
 - Loading of `id`, `title`, `scope`, `requires`, `facts`, `triggers`, `participants` (including
   their actions), `objectives` and `complete-when`, with tests in `QuestLoadTest`.
-- A trigger framework (`Trigger`, `ITriggerCondition`, `ITriggerAction`, `TriggerEvent`) with
-  two conditions, `give` and `read-book`, and one action, `set`, which sets a fact in the quest's `Instance`.
+- A trigger framework (`Trigger`, `ITriggerCondition`, `TriggerEvent`) with two conditions,
+  `give` and `read-book`. A trigger has a condition (`on:`) and a list of actions (`do:`).
+- Reusable action lists in `quests/actions`. `ActionList` parses a list of one-key maps
+  (`- set: f`) and runs them in order. Each action is an `IQuestAction` and gets an
+  `ActionContext` holding the instance, the player and the triggering event (null when no
+  trigger is involved). The only action so far is `set`, which sets one or more facts. Add new
+  action types in `ActionList.parseAction`.
 
 ## The loader doesn't match the example file
 
@@ -66,7 +71,10 @@ throw.
   - [ ] participant names should be known NPCs, or at least a typo should produce a warning.
 - [x] `objectives` and `complete-when` are loaded into `Quest.objectives` and
       `Quest.completeWhen`. `complete-when` is optional; without it a quest is open-ended.
-- [ ] Load `on-complete`; it's read nowhere yet.
+- [ ] Load `on-complete` as an `ActionList` (it's already written in that format in
+      `banner.yml`); it's read nowhere yet. It needs the `give` and `start` action types, which
+      need the plugin. `ActionList` is constructed from a section and a key, so it can load
+      the top-level `on-complete` directly.
 
 ## Wiring quests into the plugin
 
@@ -177,6 +185,12 @@ built by reflection.
       per-player state, and decide what to do if that player isn't in the quest.
 - [ ] **What actions can do.** Only `set:` exists now. Possible additions: `clear:`, giving
       items, starting another quest, or running a built-in action such as `give`.
+  - NPC quest actions still have `set:` directly in them, rather than a `do:` list. Consider
+    giving them a `do:` list too (with `desc:` alongside), so that they get every action type.
+- [ ] **Trigger action that tells nearby NPCs** (e.g. `tell-nearby: TEXT`): add text to the
+      context of LLM NPCs that can see the triggering event, so that they can react to it. It
+      would use `ActionContext.event` and `player` to find where the event happened, and needs
+      the plugin.
 
 ## Later / low priority
 

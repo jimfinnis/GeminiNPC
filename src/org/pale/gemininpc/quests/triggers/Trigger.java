@@ -5,22 +5,24 @@ import org.bukkit.entity.Player;
 import org.pale.gemininpc.quests.Instance;
 import org.pale.gemininpc.quests.Quest;
 import org.pale.gemininpc.quests.QuestException;
+import org.pale.gemininpc.quests.actions.ActionContext;
+import org.pale.gemininpc.quests.actions.ActionList;
 import org.pale.gemininpc.utils.TextUtils;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
 /**
  * triggers are events that are triggered by external actions that aren't detected by the LLM - they
- * happen directly. A trigger has two parts - a TriggerCondition and an TriggerAction.
+ * happen directly. A trigger has two parts - a condition (on:) and a list of actions (do:).
  *
  * These two are separate but combined here - the idea is that we have several condition types and
- * several action types, and we can combine them.
+ * several action types, and we can combine them. The action list is shared with other parts of the
+ * quest which run actions, such as on-complete.
  */
 public class Trigger {
     ITriggerCondition cond;
-    List<ITriggerAction> actions = new ArrayList<>();
+    ActionList actions;
     Quest quest;
 
     /// @param where where the trigger is in the quest file, for warnings
@@ -30,23 +32,17 @@ public class Trigger {
         // this is very annoying - "on" is considered a boolean in YAML, so if I want "on" as a key I have to call
         // it "true." I could use another name, but "on" is easy to remember. If someone quotes it ("on":) it
         // stays as "on", so accept that too.
-        q.warnUnknownKeys(cs, where, Set.of("on", "true", "set"));
+        q.warnUnknownKeys(cs, where, Set.of("on", "true", "do"));
         String cstr = cs.getString("on", cs.getString("true"));
         if (cstr == null)
             throw new QuestException("no on: condition");
 
         cond = parseCondition(cstr);
 
-        // actions - you can only have one of each type, simply because it makes the quest code neater.
-        // set: is one boolean fact or a list of them, as for NPC actions. Later we should be able to
-        // set non-boolean values. We could make use of the expression system to do this, with assignment
-        // operators (and with access to assignment operators gated on the type of expression we are parsing).
-        for(String fact: quest.factNames(cs, "set"))
-            actions.add(new SetAction(fact));
-        // add more later!
-
+        // the actions to run, in order, when the condition is met
+        actions = new ActionList(q, cs, "do");
         if(actions.isEmpty())
-            throw new QuestException("no action (e.g. set:), so this trigger would do nothing");
+            throw new QuestException("no do: actions, so this trigger would do nothing");
     }
 
     private ITriggerCondition parseCondition(String s){
@@ -81,8 +77,7 @@ public class Trigger {
         if(inst==null)
             return false;   // that player/world isn't doing that quest
         if(cond.check(e)) {
-            for(ITriggerAction a: actions)
-                a.run(inst);
+            actions.run(new ActionContext(inst, p, e));
             return true;
         }
         return false;

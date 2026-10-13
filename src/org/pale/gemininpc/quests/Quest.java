@@ -126,7 +126,20 @@ public class Quest {
     public List<String> factNames(ConfigurationSection cs, String key){
         if(!cs.contains(key))
             return List.of();
-        List<String> names = cs.isList(key) ? cs.getStringList(key) : List.of(cs.getString(key));
+        return factNames(key, cs.get(key));
+    }
+
+    /// Get the facts named by a value straight from the YAML, which may be a single fact or a list of them,
+    /// and check that they all exist.
+    /// @param key the key the value came from, for error messages
+    public List<String> factNames(String key, Object value){
+        List<String> names = switch(value){
+            case null -> List.of();
+            case List<?> l -> l.stream().map(String::valueOf).toList();
+            case Map<?,?> m -> throw new QuestException(key + ": should be a fact or a list of facts, not a map");
+            case ConfigurationSection s -> throw new QuestException(key + ": should be a fact or a list of facts, not a map");
+            default -> List.of(value.toString());
+        };
         if(names.isEmpty())
             throw new QuestException(key + ": no facts given");
         for(String n: names){
@@ -202,7 +215,7 @@ public class Quest {
     /// Get a list of maps which may be missing (giving an empty list). Bukkit's getMapList() quietly drops
     /// anything that isn't a map, and gives an empty list if the value isn't a list at all, so a mistake
     /// like `- give x` instead of `- on: give x` would just vanish.
-    private static List<Map<?,?>> mapList(ConfigurationSection cs, String key, String where){
+    public static List<Map<?,?>> mapList(ConfigurationSection cs, String key, String where){
         if(!cs.contains(key))
             return List.of();
         if(!cs.isList(key))

@@ -24,13 +24,16 @@ facts:
   lofgar_revealed: {}
 
 # These are deterministic actions detected by the engine, with no LLM
-# checks required. Currently actions just set facts.
+# checks required. Each has a condition (on:) and a list of actions
+# (do:) which run in order; currently the only action is set.
 
 triggers:
   - on: give "ominous banner" to ladychanter
-    set: banner_recovered
+    do:
+      - set: banner_recovered
   - on: read-book "Helga's Diary"
-    set: knows_lofgar
+    do:
+      - set: knows_lofgar
 
 # These determine what gets added to the LLM prompt under which conditions.
 # An expression parser handles the conditions.
@@ -75,5 +78,5 @@ objectives:
 
 complete-when: lofgar_revealed
 on-complete:
-  - give PAPER
+  - give: PAPER
   - start: reunion
