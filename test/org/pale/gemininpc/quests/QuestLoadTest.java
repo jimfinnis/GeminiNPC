@@ -14,7 +14,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 /// Loading quest files, and the errors and warnings for bad ones. Most tests write a small quest to a
-/// temporary file; `banner.yml` next to this file is a copy of the example quest on the test server.
+/// temporary file; `exampleconfig/quests/banner.yml` is the example quest.
 public class QuestLoadTest {
     @TempDir
     Path dir;
@@ -46,7 +46,7 @@ public class QuestLoadTest {
 
     @Test
     void exampleQuestLoads() {
-        Quest q = new Quest(Paths.get("test/org/pale/gemininpc/quests/banner.yml"), warnings);
+        Quest q = new Quest(Paths.get("exampleconfig/quests/banner.yml"), warnings);
         assertEquals(List.of(), warnings);
         assertEquals("banner", q.id);
         assertEquals("The Ominous Banner", q.title);
@@ -55,7 +55,7 @@ public class QuestLoadTest {
                 "knows_lofgar", "lofgar_revealed"), q.facts.keySet());
         assertEquals(2, q.triggers.size());
         assertEquals(Set.of("ladychanter", "helga", "prune", "lofgar"), q.npcData.keySet());
-        assertEquals(3, q.npcData.get("ladychanter").conditions.size());
+        assertEquals(4, q.npcData.get("ladychanter").conditions.size());
 
         Set<Fact.Rumour> rumours = q.getFact("helga_exposed").rumours;
         assertEquals(1, rumours.size());

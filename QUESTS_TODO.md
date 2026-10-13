@@ -1,7 +1,7 @@
 # Quests: still to do
 
 What remains on `feature/quests`. The example quest ("The Ominous Banner") is
-`test/org/pale/gemininpc/quests/banner.yml`. Edit it there: `copy.bat` copies it to the test
+`exampleconfig/quests/banner.yml`. Edit it there: `copy.bat` copies it to the test
 server's `quests` folder under the same name.
 
 ## Done
@@ -133,6 +133,14 @@ throw.
     show up through the existing context-diff mechanism.
   - The context goes per NPC, but quest state is per player, so it depends on who the NPC is
     talking to. Think about what happens when several players are nearby.
+- [ ] **NPC chat memory is shared between players.** Each NPC has one chat history
+      (`MessageWindowChatMemory` in `Chat`), but quest state is per player. Once Prunesquallor
+      has told player A that Angren is Lofgar, it's in his history, and he may tell player B,
+      who hasn't reached that stage. Keeping secrets out of personae (see the comment in
+      `banner.yml`) doesn't help here. Decide before adding prompts. Options:
+  - clear or trim an NPC's memory when it switches to talking to a different player;
+  - keep a separate memory per player for NPCs that are quest participants;
+  - accept it for `scope: world` quests, whose state is shared anyway.
 - [ ] **Rumours.** When a fact with rumours becomes true, add each rumour's text to the context
       of the NPCs in `spreads-to`. The names there can be single NPCs or groups such as `[nuns]`,
       so a group needs defining somewhere, perhaps in the persona or in config.
@@ -222,5 +230,9 @@ built by reflection.
 - [ ] YAML quoting: a condition that starts with a quote, `[`, `{`, `*`, `&`, `!` or `#`, or
       contains `: `, must have the whole value quoted. Document this in the README.
 - [ ] README section on quests: file format, the expression language, triggers and actions.
+      Include how to write NPCs for a quest: the persona holds only the NPC's public face and
+      cover stories, and each secret goes in the stage prompt where the NPC may use it,
+      because an NPC can't reliably keep a secret that's in its prompt. The comment above
+      `participants:` in `banner.yml` explains this with examples.
 - [x] Get Maven to run the tests in `./test`, by setting `<testSourceDirectory>`. Note that
       `mvn` (`clean install`) now fails if a test fails.

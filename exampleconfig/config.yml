@@ -18,6 +18,10 @@ model:
 
 common-template-directories:
     - plugins/GeminiNPC/common-templates
+
+# every .yml or .yaml file in these directories is loaded as a quest
+quest-directories:
+    - plugins/GeminiNPC/quests
     
 
 persona-directories:
@@ -37,7 +41,6 @@ template-values:
             - You speak like a stereotypical English upper-class person.
             - You speak with a rural accent.
             - You speak with a rural West Country accent.
-            - You are a bit of a gossip.
             - You speak in an educated way, with a fondness for Latin.
         - You are a bit of a philosopher.
         - You are rather vague.
@@ -47,8 +50,20 @@ template-values:
             - You are a devotee of Gormenghast and its ritual.
         - You are an agent of Chaos.
         - You love the bees.
-        - You are a little too fond of bad puns.
+        - You are a bit of a gossip.
         - You are a little too fond of swearing.
+        - You are very calm.
+        
+    characters:
+        - Prunesquallor, the doctor
+        - The Lady Fuchsia, the daughter of the House of Groan
+        - The Cantor and his strange language
+        - The Namer, isolated in his tower
+        - Sallowchime, the irascible architect
+        - Boris, the guard
+        - Trench, the guard who dreams of being an actor
+        - Quicklime, the alchemist
+        - Cantel, the kind priest
 
 texts:
     location-list-start: "Locations you can go to: "

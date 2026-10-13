@@ -1,0 +1,138 @@
+# quests/ominous-banner.yml
+id: banner
+title: The Ominous Banner
+scope: player
+requires: []  # previous quests
+
+# these are the quest's variables; at the moment they are just booleans
+# but later we may introduce (say) counters.
+facts:
+  # Quests with no extra data (rumours at the moment) need to have
+  # a dummy item in them so they parse. Bukkit's YAML parser seems
+  # to strip them otherwise.
+  banner_recovered: {}
+  prune_consulted: {}
+  helga_exposed:
+    rumours:
+      the-nuns-know:
+        # This is a rumour that spreads to [nuns]; list members are either a
+        # single NPC or a group of NPCs.
+        spreads-to: [nuns]
+        text: It is whispered that Helga hung the banner on the walls.
+  helga_confessed: {}
+  knows_lofgar: {}
+  lofgar_revealed: {}
+
+# These are deterministic actions detected by the engine, with no LLM
+# checks required. Each has a condition (on:) and a list of actions
+# (do:) which run in order; currently the only action is set.
+
+triggers:
+  - on: give "ominous banner" to ladychanter
+    do:
+      - set: banner_recovered
+  - on: read-book "Helga's Diary"
+    do:
+      - set: knows_lofgar
+
+# These determine what gets added to the LLM prompt under which conditions.
+# An expression parser handles the conditions.
+#
+# Keep secrets out of the personae: an NPC can't reliably keep a secret that's
+# in its prompt, and a persona applies before the quest has even started. A
+# persona holds only the NPC's public face, and cover stories which are safe
+# to leak (e.g. Prunesquallor thinks well of Angren). Each secret goes in the
+# prompt for the stage at which the NPC may use it (e.g. Prunesquallor only
+# learns that Angren is Lofgar once the player knows the name). An NPC can be
+# told that it has a secret without being told what it is, as Helga is at
+# first; it can't give away what it doesn't know.
+participants:
+  ladychanter:
+    - when: not banner_recovered
+      prompt: You've heard an ominous banner hangs from the convent walls. Ask the player to fetch it.
+    - when: banner_recovered and not helga_exposed
+      prompt: >-
+        The player has brought you the ominous banner. You're uneasy about who
+        hung it; suggest they ask Doctor Prunesquallor's opinion.
+    - when: helga_exposed and not knows_lofgar
+      prompt: >-
+        You've learned that Helga hung the banner. You suspect there's more to
+        it. Helga keeps a chest in her room; ask the player to look in it.
+    - when: knows_lofgar and not lofgar_revealed
+      prompt: >-
+        The player has learned from Helga's diary that her father is a pillager
+        called Lofgar. You'll help her however you can; suggest the player asks
+        Doctor Prunesquallor, who knows everyone's history.
+  helga:
+    - when: not helga_confessed
+      prompt: >-
+        You secretly find the pillagers exciting. One night you hung a pillager
+        banner on the convent walls, and nobody knows. You had a reason, which
+        you will never tell anyone. If you are accused with good reason, confess
+        to hanging the banner, but not your reason.
+      actions:
+        confess:
+          desc: "You admit to the player that you hung the banner"
+          do:
+            - set: [helga_confessed, helga_exposed]
+    - when: helga_confessed and not knows_lofgar
+      prompt: >-
+        You have admitted hanging the banner, but you won't say why, however
+        you're asked.
+    - when: knows_lofgar
+      prompt: >-
+        The player has read your diary, so they know your secret: a book left
+        behind by the pillagers after their latest raid told you that your
+        father is a pillager called Lofgar, and you hung the banner hoping to
+        draw the pillagers back, and him with them. You're contrite about
+        endangering the convent, and desperate to find him.
+  prune:
+    - when: banner_recovered
+      prompt: >-
+        Some nights ago you saw Helga, one of the nuns, by the convent walls
+        late at night with something rolled up under her arm; you thought little
+        of it. The player has recovered an ominous banner from those walls. If
+        asked about it, you realise it may be what you saw Helga carrying.
+      actions:
+        tell_about_helga:
+          desc: "You tell the player you saw Helga by the walls at night with something rolled up"
+          do:
+            - set: [prune_consulted, helga_exposed]
+    - when: knows_lofgar
+      prompt: >-
+        You keep a secret: Angren, the keeper of the tombs, was once a pillager
+        chieftain called Lofgar. He told you his story long ago, and you will
+        not betray him lightly. The player may have learned the name Lofgar; if
+        they show they know it, you may tell them that Angren is Lofgar.
+      actions:
+        reveal_angren:
+          desc: "You tell the player that Angren the tomb-keeper is Lofgar"
+          do:
+            - set: lofgar_revealed
+  lofgar:
+    - when: lofgar_revealed
+      prompt: >-
+        Your secret is out: you are really Lofgar, once a chieftain of the
+        pillagers. You found love with a local woman and fled your comrades. You
+        had a baby girl together, then your lover died of a sudden sickness. Your
+        comrades nearly found you, so you left your daughter with a travelling
+        merchant, knowing she could never be safe with you, and travelled far,
+        to the castle, where you became Angren. Only Prunesquallor knew, and he
+        has now told the player. You're wary, but ache to know if your daughter
+        lives.
+
+# Used to help the player track objectives. Implementation is low-priority.
+objectives:
+  - text: Retrieve the banner from the convent walls
+    done: banner_recovered
+  - text: Find out who hung it
+    done: helga_exposed
+  - text: Uncover Helga's secret
+    done: knows_lofgar
+
+# Implementation of completion testing is low-priority.
+
+complete-when: lofgar_revealed
+on-complete:
+  - give: PAPER
+  - start: reunion

@@ -173,7 +173,7 @@ public class QuestRegistryTest {
     @Test
     void exampleQuestNPCs() {
         // as on the test server: some NPCs are named in the quest by their persona
-        Quest q = new Quest(Paths.get("test/org/pale/gemininpc/quests/banner.yml"), warnings);
+        Quest q = new Quest(Paths.get("exampleconfig/quests/banner.yml"), warnings);
         reg.add(q, "banner.yml");
         assertEquals(List.of(), reg.checkNPCs(List.of(
                 chat(1, "Lady Chanter", "ladychanter"),
