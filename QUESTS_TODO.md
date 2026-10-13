@@ -2,7 +2,7 @@
 
 What remains on `feature/quests`. The example quest ("The Ominous Banner") is
 `test/org/pale/gemininpc/quests/banner.yml`. Edit it there: `copy.bat` copies it to the test
-server as `test.yml`.
+server's `quests` folder under the same name.
 
 ## Done
 
