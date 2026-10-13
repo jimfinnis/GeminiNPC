@@ -25,6 +25,7 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import org.bukkit.configuration.ConfigurationSection;
+import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.file.FileConfiguration;
 
 import org.jetbrains.annotations.NotNull;
@@ -96,7 +97,50 @@ public class Plugin extends JavaPlugin implements Listener {
 
     @Override
     public void onDisable() {
+        saveQuestStates();
         getLogger().info("GeminiNPC has been disabled");
+    }
+
+    /// Where quest progress is saved.
+    private Path questStateFile() {
+        return getDataFolder().toPath().resolve("queststate.yml");
+    }
+
+    /// Set if loading the quest state failed, so that we don't save over the file and lose what's in it.
+    private boolean questStateLoadFailed = false;
+
+    /// Load quest progress at startup. If the file can't be read, it's renamed aside, so that saving
+    /// doesn't overwrite it, and everyone starts with no progress.
+    private void loadQuestStates() {
+        Path file = questStateFile();
+        try {
+            for(String w: questStates.load(file))
+                warn("Quest state file: " + w);
+            log("Loaded quest state from " + file);
+        } catch (IOException | InvalidConfigurationException e) {
+            Path aside = file.resolveSibling(file.getFileName() + ".broken-" + System.currentTimeMillis());
+            try {
+                Files.move(file, aside);
+                getLogger().log(Level.SEVERE, "Can't read quest state from " + file
+                        + "; it has been renamed to " + aside + " and quest progress starts empty", e);
+            } catch (IOException e2) {
+                // we couldn't move it either, so make sure we never save over it
+                questStateLoadFailed = true;
+                getLogger().log(Level.SEVERE, "Can't read quest state from " + file + ", or rename it; "
+                        + "quest progress won't be saved until this is fixed", e);
+            }
+        }
+    }
+
+    /// Save quest progress. Call this after anything changes it.
+    public void saveQuestStates() {
+        if(questStateLoadFailed)
+            return;
+        try {
+            questStates.save(questStateFile());
+        } catch (IOException e) {
+            getLogger().log(Level.SEVERE, "Can't save quest state to " + questStateFile(), e);
+        }
     }
 
     public Plugin() {
@@ -150,6 +194,9 @@ public class Plugin extends JavaPlugin implements Listener {
         // if there isn't a config file, create one from the default that gets compiled into the jar (it's in
         // the project as config.yml)
         saveDefaultConfig();
+
+        // quest progress; this isn't reloaded by /gemini reload, which keeps what's in memory
+        loadQuestStates();
 
         // register the commands automatically - these are tagged with @Cmd.
         commandRegistry.register(this); // register commands
@@ -215,8 +262,10 @@ public class Plugin extends JavaPlugin implements Listener {
         try {
             log("Attempting to fire quest event: " + what);
             List<String> fired = quests.fire(p, e);
-            if(!fired.isEmpty())
+            if(!fired.isEmpty()) {
                 log("Quest event: " + what + " - fired " + String.join(", ", fired));
+                saveQuestStates();
+            }
         } catch (RuntimeException ex) {
             getLogger().log(Level.WARNING, "Error handling quest event: " + what, ex);
         }

@@ -45,12 +45,16 @@ public class QuestCommands {
                 case "set" -> {
                     if(rest.length!=4)
                         throw new QuestException("usage: /gemini quest set PLAYER QUEST FACT true|false");
-                    yield debug.set(findPlayer(rest[0]), rest[1], rest[2], rest[3]);
+                    List<String> result = debug.set(findPlayer(rest[0]), rest[1], rest[2], rest[3]);
+                    plugin.saveQuestStates();
+                    yield result;
                 }
                 case "reset" -> {
                     if(rest.length<1 || rest.length>2)
                         throw new QuestException("usage: /gemini quest reset PLAYER [QUEST]");
-                    yield debug.reset(findPlayer(rest[0]), rest.length==2 ? rest[1] : null);
+                    List<String> result = debug.reset(findPlayer(rest[0]), rest.length==2 ? rest[1] : null);
+                    plugin.saveQuestStates();
+                    yield result;
                 }
                 default -> throw new QuestException("unknown quest command \"" + args[0] + "\"; try " + USAGE);
             };

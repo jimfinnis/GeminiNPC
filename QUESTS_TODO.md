@@ -128,8 +128,21 @@ throw.
   - [ ] `on-complete: start: reunion` in `banner.yml` is now redundant: `reunion` would just
         `require` `banner`. Remove `start:` from the planned action types, unless a quest
         that only starts explicitly turns out to be needed (e.g. a `start: manual` setting).
-- [ ] **Persistence.** Save quest state across restarts, either in a YAML file per player or one
-      file for everything, under the plugin data folder.
+- [x] **Persistence.** Quest state is saved in `plugins/GeminiNPC/queststate.yml`, keyed by
+      quest ID, then player UUID (or `world`), with `completed` and the facts
+      (`QuestStates.save`/`load`). `Plugin` loads it on enable (not on `/gemini reload`, which
+      keeps what's in memory) and saves it on disable and after anything changes it: a trigger
+      firing, or `/gemini quest set`/`reset`.
+  - The file is written to a temporary file that then replaces it, so a crash can't leave
+    it half-written.
+  - State for a quest that isn't loaded (its file is missing or broken) is kept and saved as
+    it is, so fixing the quest file doesn't find everyone's progress gone.
+  - A file that can't be read is renamed to `queststate.yml.broken-<time>` rather than
+    overwritten, and progress starts empty. If it can't even be renamed, nothing is saved
+    until it's fixed.
+  - [ ] Anything else that changes quest state must call `Plugin.saveQuestStates()` too,
+        notably NPC quest actions once they're wired in.
+  - [ ] Test in game: set some facts, restart the server, and check `/gemini quest state`.
 - [x] **Evaluating conditions.** `Instance.test(expr)` evaluates an expression against the
       instance's facts; it's true if the result is a nonzero integer.
   - [ ] An expression that type-checks badly at runtime (e.g. `"x" and f`) throws. Nothing
@@ -180,8 +193,7 @@ throw.
       The logic is in `QuestDebug`, which is tested; `commands/QuestCommands` finds the player,
       online or offline, and prints the result.
   - [x] Tested in game.
-  - [ ] Quest state isn't saved yet (see "Persistence"), so everything set here is lost on a
-        restart, though not on `/gemini reload`.
+  - [x] Changes made with these commands are saved (see "Persistence").
 
 ## NPC quest actions (`participants.<npc>[].actions`)
 
