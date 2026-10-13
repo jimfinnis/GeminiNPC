@@ -38,6 +38,7 @@ import org.pale.gemininpc.quests.Quest;
 import org.pale.gemininpc.quests.QuestException;
 import org.pale.gemininpc.quests.QuestNPCs;
 import org.pale.gemininpc.quests.QuestRegistry;
+import org.pale.gemininpc.quests.QuestStates;
 import org.pale.gemininpc.waypoints.Waypoint;
 import org.pale.gemininpc.waypoints.Waypoints;
 
@@ -189,8 +190,12 @@ public class Plugin extends JavaPlugin implements Listener {
     // This is a map of persona name onto the persona string loaded from each file.
     public final Map<String, Persona> personae = new HashMap<>();
 
+    /// Everyone's quest progress. This is kept for the life of the plugin, and handed to each new registry,
+    /// so that a reload doesn't lose it.
+    final QuestStates questStates = new QuestStates();
+
     /// All the loaded quests. Replaced with a new registry each time the config is loaded.
-    QuestRegistry quests = new QuestRegistry();
+    QuestRegistry quests = new QuestRegistry(questStates);
 
     public QuestRegistry getQuests() {
         return quests;
@@ -353,7 +358,7 @@ public class Plugin extends JavaPlugin implements Listener {
         // pull in the quests. These go into a new registry, which replaces the old one once they're all
         // loaded, so a reload starts afresh.
         Plugin.log("Loading quests!");
-        QuestRegistry newQuests = new QuestRegistry();
+        QuestRegistry newQuests = new QuestRegistry(questStates);
         processFilesInConfigDirectory(c, "quest-directories",
                 (name, path) -> {
                     // skip editor backups (e.g. "quest.yml~") and anything else that isn't YAML

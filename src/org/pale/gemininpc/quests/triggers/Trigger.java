@@ -72,16 +72,10 @@ public class Trigger {
         return cond.npcNames();
     }
 
-    /**
-     * Check if an event is valid for this player (i.e. the player is doing this
-     * trigger's quest), and then run it if the check matches.
-     *
-     * Also check the world event.
-     */
-    boolean check(Player p, TriggerEvent e) {
-        Instance inst = quest.getInstance(p);
-        if(inst==null)
-            return false;   // that player/world isn't doing that quest
+    /// If the event matches the trigger's condition, run its actions on the given state. The caller
+    /// (`QuestRegistry.fire`) has already checked that the quest is active for the player, and found the
+    /// right state: the player's own, or the world's for a world quest. Returns true if the trigger fired.
+    public boolean check(Instance inst, Player p, TriggerEvent e) {
         if(cond.check(e)) {
             actions.run(new ActionContext(inst, p, e.npc(), e));
             return true;

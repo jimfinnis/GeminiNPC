@@ -4,7 +4,6 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.InvalidConfigurationException;
 import org.bukkit.configuration.MemoryConfiguration;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.entity.Player;
 import org.pale.gemininpc.quests.expr.Parser;
 import org.pale.gemininpc.quests.expr.TreeNode;
 import org.pale.gemininpc.quests.triggers.Trigger;
@@ -54,12 +53,6 @@ public class Quest {
 
     /// The quest is complete when this is true; null if the quest has no complete-when and is open-ended.
     TreeNode completeWhen;
-
-    /**
-     * Instances of the quest actually running, keyed by player UUID. If there is only one global instance
-     * it is keyed under null.
-     */
-    Map<UUID, Instance> instances = new HashMap<>();
 
     /// Every key allowed at the top level of a quest file. Anything else gets a warning, since it's
     /// probably a typo.
@@ -245,28 +238,11 @@ public class Quest {
         }
     }
 
-    ///  Start the quest for a given player. If this is a world quest, we create it with a null
-    /// player key instead of that passed in!
-    Instance start(Player p){
-        UUID key = instanceKey(p);
-        if(instances.containsKey(key))
-            throw new RuntimeException(String.format("Cannot have more than one instance of quest %s for %s ",
-                    id,(key==null) ? "the world" : ("player "+p.getName())
-                    ));
-        var instance = new Instance(this, key);
-        instances.put(key, instance);
-        return instance;
-    }
-
-    /// Return an instance of the quest, or the instance keyed to null for world quests.
-    public Instance getInstance(Player p){
-        return instances.get(instanceKey(p));
-    }
-
-    /// The key for a player's instance: their UUID, which (unlike the `Player` object) stays the same
-    /// when they log out and back in. World quests have one instance, keyed under null.
-    private UUID instanceKey(Player p){
-        return player_only ? p.getUniqueId() : null;
+    /// The key a player's state for this quest is kept under (see `QuestStates`): their UUID, which
+    /// (unlike the `Player` object) stays the same when they log out and back in. A world quest has one
+    /// state shared by everyone, kept under null.
+    UUID stateKey(UUID player){
+        return player_only ? player : null;
     }
 
     public Fact getFact(String s){

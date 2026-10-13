@@ -18,7 +18,7 @@ public class QuestRegistryTest {
     Path dir;
 
     final List<String> warnings = new ArrayList<>();
-    final QuestRegistry reg = new QuestRegistry();
+    final QuestRegistry reg = new QuestRegistry(new QuestStates());
 
     /// Load a quest from YAML and add it to the registry under the given file name.
     private Quest add(String fileName, String yaml) throws IOException {

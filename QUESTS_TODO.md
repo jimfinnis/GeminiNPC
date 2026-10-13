@@ -81,8 +81,8 @@ throw.
 - [x] `objectives` and `complete-when` are loaded into `Quest.objectives` and
       `Quest.completeWhen`. `complete-when` is optional; without it a quest is open-ended.
 - [ ] Load `on-complete` as an `ActionList` (it's already written in that format in
-      `banner.yml`); it's read nowhere yet. It needs the `give` and `start` action types, which
-      need the plugin. `ActionList` is constructed from a section and a key, so it can load
+      `banner.yml`); it's read nowhere yet. It needs the `give` action type, which needs the
+      plugin (`start` probably isn't needed; see "Quest state" below). `ActionList` is constructed from a section and a key, so it can load
       the top-level `on-complete` directly.
 
 ## Wiring quests into the plugin
@@ -114,18 +114,26 @@ throw.
   - [x] `Plugin.processFilesInConfigDirectory`, which personae and templates also use: a missing
         directory no longer stops the whole config loading, and the `~` backup check now tests
         each file rather than the directory name.
-- [ ] **Quest state.** Started: `Instance` holds a fact-value map, and `Quest.start` /
-      `getInstance` keep one per player UUID for `scope: player` and one for `scope: world`.
-      Still to do:
-  - which quests each player has started or completed, and which are active, so that
-    `requires` and `start:` can work;
-  - how a quest starts in the first place: automatically when everything it requires is
-    complete, or through `on-complete: start:` from another quest, or both.
+- [x] **Quest state.** A quest is active for a player once every quest it `requires` is
+      complete for them, and until its own `complete-when` is true. A quest with no
+      `requires` is active from the start, and there's no separate start step
+      (`QuestRegistry.isActive`, `activeQuests`, `activeInstance`).
+  - State lives in `QuestStates` (`Plugin.questStates`), not in `Quest`, so it survives
+    `/gemini reload`. It's keyed by quest ID and player UUID, or null for a world quest. An
+    `Instance` is created the first time an active quest needs one, and brought up to date
+    if the quest is reloaded with different facts: kept facts keep their values, new ones
+    start false, and removed ones are dropped.
+  - A player quest can require a world quest, and becomes active for everyone once the
+    world quest is complete.
+  - [ ] `on-complete: start: reunion` in `banner.yml` is now redundant: `reunion` would just
+        `require` `banner`. Remove `start:` from the planned action types, unless a quest
+        that only starts explicitly turns out to be needed (e.g. a `start: manual` setting).
 - [ ] **Persistence.** Save quest state across restarts, either in a YAML file per player or one
       file for everything, under the plugin data folder.
-- [ ] **Evaluating conditions.** Build an `Evaluator` from a state's fact map, setting each fact
-      to `Value.TRUE` or `Value.FALSE`. Every fact must be set, or the evaluator throws
-      `unknown identifier`.
+- [x] **Evaluating conditions.** `Instance.test(expr)` evaluates an expression against the
+      instance's facts; it's true if the result is a nonzero integer.
+  - [ ] An expression that type-checks badly at runtime (e.g. `"x" and f`) throws. Nothing
+        catches this yet; the plugin should catch it where it calls `fire` and log it.
 - [ ] **Adding prompts.** For each NPC/player pair the NPC talks to, find the active quests where
       the NPC is a participant and collect the `prompt` of every `when` that's true.
   - Decide where this goes: the system instruction is rendered only once per chat, so quest
@@ -144,12 +152,12 @@ throw.
 - [ ] **Rumours.** When a fact with rumours becomes true, add each rumour's text to the context
       of the NPCs in `spreads-to`. The names there can be single NPCs or groups such as `[nuns]`,
       so a group needs defining somewhere, perhaps in the persona or in config.
-- [ ] **Firing triggers.** `Trigger.check(player, event)` finds the instance and runs the
-      actions on it. Still to do:
-  - `Trigger.check` is package-private, so add a public entry point (on `Quest` or a quest
-    manager) that checks an event against every loaded quest's triggers.
-  - Call `Trigger.check` from `ChatEventListener` on the matching Bukkit events: NPC
-    right-click gives for `give`, and `bookRead` for `read-book`.
+- [ ] **Firing triggers.** `QuestRegistry.fire(player, event)` runs an event through the
+      triggers of every quest active for the player, then checks those quests for
+      completion. Quests that become active because the event completed another one don't
+      see the same event. Still to do:
+  - Call `fire` from `ChatEventListener` on the matching Bukkit events: NPC right-click gives
+    for `give`, and `bookRead` for `read-book`.
 - [ ] **Commands for debugging**, e.g. `/gemini quest list`, `/gemini quest state PLAYER`,
       `/gemini quest set PLAYER QUEST FACT true|false` and `/gemini quest reset`.
 
@@ -222,8 +230,9 @@ built by reflection.
 
 - [ ] Objectives: show the player their current objectives, through a command, a book or the
       scoreboard.
-- [ ] Completion: check `complete-when` after every state change, then run `on-complete`, which
-      handles `give ITEM` and `start: QUEST`.
+- [ ] Completion: `QuestRegistry.checkCompletion` marks a quest complete when its
+      `complete-when` becomes true; `fire` calls it after triggers. Still to do: call it after
+      NPC quest actions too, and run `on-complete` there (e.g. `give ITEM`).
 - [ ] Counters or other non-boolean facts. The expression language already handles integers
       and strings, so most of the work is in the state and in the actions, e.g. `add:`.
 - [x] The `x` placeholder for facts with no data. The example now uses `fact: {}` instead.

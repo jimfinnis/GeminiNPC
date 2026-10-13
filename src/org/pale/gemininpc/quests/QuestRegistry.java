@@ -1,14 +1,32 @@
 package org.pale.gemininpc.quests;
 
+import org.bukkit.entity.Player;
+import org.pale.gemininpc.quests.triggers.Trigger;
+import org.pale.gemininpc.quests.triggers.TriggerEvent;
+
 import java.util.*;
 
 /// All the loaded quests, by ID, with the checks which need more than one quest file (such as `requires`)
-/// or need to know which NPCs exist. It doesn't use the plugin, so it can be tested; `Plugin` builds a new
-/// one each time the config is loaded.
+/// or need to know which NPCs exist, and the rules for which quests are active for a player. It doesn't
+/// use the plugin, so it can be tested; `Plugin` builds a new one each time the config is loaded, passing
+/// in the same `QuestStates` each time so that progress survives a reload.
+///
+/// A quest is active for a player once every quest it requires is complete for them, and stays active
+/// until its own `complete-when` is true. So a quest with no `requires` is active from the start. There's
+/// no separate step to start a quest.
 public class QuestRegistry {
     private final Map<String, Quest> quests = new LinkedHashMap<>();
     // the file each quest came from, by quest ID, for messages
     private final Map<String, String> files = new HashMap<>();
+    private final QuestStates states;
+
+    public QuestRegistry(QuestStates states){
+        this.states = states;
+    }
+
+    public QuestStates getStates(){
+        return states;
+    }
 
     /// Add a quest which has just been loaded. Throws a `QuestException` if another quest has the same ID,
     /// in which case the first one is kept.
@@ -30,6 +48,76 @@ public class QuestRegistry {
 
     public int size(){
         return quests.size();
+    }
+
+    // ---- quest state ----
+
+    /// True if the quest is complete for the player (or for the world, if it's a world quest).
+    public boolean isComplete(Quest q, UUID player){
+        Instance inst = states.get(q, player);
+        return inst!=null && inst.completed;
+    }
+
+    /// True if the quest is active for the player: everything it requires is complete for them, and it
+    /// isn't complete itself. A required quest which doesn't exist is never complete (and gives a warning
+    /// when the quests load), so a quest requiring it is never active.
+    public boolean isActive(Quest q, UUID player){
+        if(isComplete(q, player))
+            return false;
+        for(String r: q.requires){
+            Quest rq = quests.get(r);
+            if(rq==null || !isComplete(rq, player))
+                return false;
+        }
+        return true;
+    }
+
+    /// The player's state for a quest if the quest is active for them, creating it the first time; null if
+    /// the quest isn't active.
+    public Instance activeInstance(Quest q, UUID player){
+        return isActive(q, player) ? states.getOrCreate(q, player) : null;
+    }
+
+    /// The quests active for a player, in the order they were loaded.
+    public List<Quest> activeQuests(UUID player){
+        return quests.values().stream().filter(q -> isActive(q, player)).toList();
+    }
+
+    /// Check whether a quest has just been completed, after its facts have changed, and mark it complete if
+    /// so. Returns true if it has. Quests which require it become active as a result.
+    /// Later, this is where `on-complete` will run.
+    public boolean checkCompletion(Quest q, Instance inst){
+        if(inst.completed || q.completeWhen==null || !inst.test(q.completeWhen))
+            return false;
+        inst.completed = true;
+        return true;
+    }
+
+    /// Run an event through the triggers of every quest active for the player, running the actions of any
+    /// that match, then check those quests for completion. Returns true if any trigger fired.
+    ///
+    /// The active quests are found before any triggers run, so a quest which only becomes active because
+    /// this event completed another one doesn't also see the event.
+    public boolean fire(Player p, TriggerEvent e){
+        UUID player = p.getUniqueId();
+        Map<Quest, Instance> active = new LinkedHashMap<>();
+        for(Quest q: quests.values()){
+            Instance inst = activeInstance(q, player);
+            if(inst!=null)
+                active.put(q, inst);
+        }
+        boolean fired = false;
+        for(var entry: active.entrySet()){
+            Quest q = entry.getKey();
+            Instance inst = entry.getValue();
+            boolean changed = false;
+            for(Trigger t: q.triggers)
+                changed |= t.check(inst, p, e);
+            if(changed)
+                checkCompletion(q, inst);
+            fired |= changed;
+        }
+        return fired;
     }
 
     /// Check that every quest's `requires` names a quest which exists. Call this once all the quests are
