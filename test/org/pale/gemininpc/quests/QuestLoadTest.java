@@ -64,11 +64,11 @@ public class QuestLoadTest {
         // conditions are in a set, so find Helga's one with an action
         NPCQuestCondition.Action confess = q.npcData.get("helga").conditions.stream()
                 .map(c -> c.actions.get("confess")).filter(a -> a != null).findFirst().orElseThrow();
-        assertEquals(List.of("helga_confessed", "helga_exposed"), confess.set());
+        assertEquals(1, confess.actions().size());   // one set: of two facts
         assertEquals("You admit to the player that you hung the banner", confess.desc());
         NPCQuestCondition.Action reveal = q.npcData.get("prune").conditions.stream()
                 .map(c -> c.actions.get("reveal_angren")).filter(a -> a != null).findFirst().orElseThrow();
-        assertEquals(List.of("lofgar_revealed"), reveal.set());   // a single fact rather than a list
+        assertEquals(1, reveal.actions().size());
         assertEquals("You tell the player that Angren the tomb-keeper is Lofgar", reveal.desc());
 
         assertEquals(3, q.objectives.size());
@@ -415,26 +415,33 @@ public class QuestLoadTest {
                   helga:
                     - when: not f
                       actions:
-                        confess: { set: f, desc: "You confess" }
+                        confess:
+                          desc: You confess
+                          do:
+                            - set: f
                 """);
         assertEquals(List.of(), warnings);
     }
 
     @Test
     void actionSetsUnknownFact() {
-        assertEquals("participants.helga #1: actions.confess: set: there is no fact called \"g\"", fails(HEADER + """
+        assertEquals("participants.helga #1: actions.confess: do #1: set: there is no fact called \"g\"",
+                fails(HEADER + """
                 facts:
                   f: {}
                 participants:
                   helga:
                     - when: f
                       actions:
-                        confess: { set: [f, g] }
+                        confess:
+                          desc: You confess
+                          do:
+                            - set: [f, g]
                 """));
     }
 
     @Test
-    void actionWithoutSet() {
+    void actionWithoutDo() {
         String msg = fails(HEADER + """
                 facts:
                   f: {}
@@ -442,9 +449,26 @@ public class QuestLoadTest {
                   helga:
                     - when: f
                       actions:
-                        confess: { desc: "You confess" }
+                        confess:
+                          desc: You confess
                 """);
-        assertTrue(msg.startsWith("participants.helga #1: actions.confess: no set:"), msg);
+        assertTrue(msg.startsWith("participants.helga #1: actions.confess: no do: actions"), msg);
+    }
+
+    @Test
+    void actionWithOldStyleSet() {
+        // set: directly on the action, as it used to be, rather than in a do: list
+        String msg = fails(HEADER + """
+                facts:
+                  f: {}
+                participants:
+                  helga:
+                    - when: f
+                      actions:
+                        confess: { set: f, desc: "You confess" }
+                """);
+        assertTrue(msg.startsWith("participants.helga #1: actions.confess: no do: actions"), msg);
+        assertEquals(List.of("participants.helga #1.actions.confess: unknown key \"set\" (ignored)"), warnings);
     }
 
     @Test
@@ -456,7 +480,9 @@ public class QuestLoadTest {
                   helga:
                     - when: f
                       actions:
-                        confess: { set: f }
+                        confess:
+                          do:
+                            - set: f
                 """);
         assertTrue(msg.startsWith("participants.helga #1: actions.confess: no desc:"), msg);
     }
@@ -470,7 +496,10 @@ public class QuestLoadTest {
                   helga:
                     - when: f
                       actions:
-                        confess: { set: f, desc: "  " }
+                        confess:
+                          desc: "  "
+                          do:
+                            - set: f
                 """);
         assertTrue(msg.startsWith("participants.helga #1: actions.confess: no desc:"), msg);
     }
@@ -486,7 +515,7 @@ public class QuestLoadTest {
                       actions:
                         confess: f
                 """);
-        assertTrue(msg.startsWith("participants.helga #1: actions.confess: must contain set:"), msg);
+        assertTrue(msg.startsWith("participants.helga #1: actions.confess: must contain desc: and do:"), msg);
     }
 
     @Test
@@ -511,7 +540,11 @@ public class QuestLoadTest {
                   helga:
                     - when: f
                       actions:
-                        confess: { set: f, desc: "You confess", colour: red }
+                        confess:
+                          desc: You confess
+                          colour: red
+                          do:
+                            - set: f
                 """);
         assertEquals(List.of("participants.helga #1.actions.confess: unknown key \"colour\" (ignored)"),
                 warnings);

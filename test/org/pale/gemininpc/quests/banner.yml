@@ -49,18 +49,27 @@ participants:
     - when: not helga_confessed
       prompt: You secretly hung the banner. If accused with good reason, confess.
       actions:
-        confess: { set: [helga_confessed, helga_exposed], desc: "You admit to the player that you hung the banner" }
+        confess:
+          desc: "You admit to the player that you hung the banner"
+          do:
+            - set: [helga_confessed, helga_exposed]
     - when: helga_confessed and knows_lofgar
       prompt: Your father is Lofgar. You are contrite and desperate to find him.
   prune:
     - when: banner_recovered
       prompt: If asked about the banner, you recall seeing Helga by the walls at night with something rolled up.
       actions:
-        tell_about_helga: { set: [prune_consulted, helga_exposed], desc: "You tell the player you saw Helga by the walls at night with something rolled up" }
+        tell_about_helga:
+          desc: "You tell the player you saw Helga by the walls at night with something rolled up"
+          do:
+            - set: [prune_consulted, helga_exposed]
     - when: knows_lofgar
       prompt: You know Angren the tomb-keeper was once Lofgar. Reveal it only if the player shows they know his name.
       actions:
-        reveal_angren: { set: lofgar_revealed, desc: "You tell the player that Angren the tomb-keeper is Lofgar" }
+        reveal_angren:
+          desc: "You tell the player that Angren the tomb-keeper is Lofgar"
+          do:
+            - set: lofgar_revealed
   lofgar:
     - when: lofgar_revealed
       prompt: Prunesquallor has told the player who you really are. You're wary, but ache to know if your daughter lives.

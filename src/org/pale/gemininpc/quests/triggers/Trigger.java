@@ -77,7 +77,7 @@ public class Trigger {
         if(inst==null)
             return false;   // that player/world isn't doing that quest
         if(cond.check(e)) {
-            actions.run(new ActionContext(inst, p, e));
+            actions.run(new ActionContext(inst, p, e.npc(), e));
             return true;
         }
         return false;

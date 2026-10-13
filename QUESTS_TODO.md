@@ -139,8 +139,9 @@ part, because they connect quest data to the existing `@Action` system, which is
 built by reflection.
 
 - [x] **Loading.** `NPCQuestCondition.actions` maps each action name to an `Action` record of
-      the facts to set and the description. `set:` is required and its facts are checked.
-      `desc:` is also required.
+      the description and an `ActionList` loaded from `do:`, the same kind of list a trigger
+      has. Both `desc:` and `do:` are required. When the action runs, its `ActionContext`
+      should have the NPC whose LLM chose it, and the player from the reply.
   - The NPC's `prompt` decides whether and when the NPC does something (Prune reveals
     Angren's identity "only if the player shows they know his name"). The `desc` says what
     event the action records, so that the LLM includes the action in the reply in which that
@@ -167,6 +168,9 @@ built by reflection.
       a list, or give quest actions their own field, before wiring quest actions in. This
       affects the JSON shape in the `common` template, `Chat.Response`, `processResponse` and
       the README.
+  - A quest action's `do:` list already covers combinations the author can foresee: Helga's
+    `confess` could set facts and give an item in one action. This item is for the
+    combinations they can't.
 - [ ] **Recovering from a missed action.** The NPC's `when` stays true after it reveals
       something in text without the action, so it will probably reveal it again when asked,
       which gives the LLM another chance; that's not guaranteed, though. The admin escape hatch
@@ -185,8 +189,9 @@ built by reflection.
       per-player state, and decide what to do if that player isn't in the quest.
 - [ ] **What actions can do.** Only `set:` exists now. Possible additions: `clear:`, giving
       items, starting another quest, or running a built-in action such as `give`.
-  - NPC quest actions still have `set:` directly in them, rather than a `do:` list. Consider
-    giving them a `do:` list too (with `desc:` alongside), so that they get every action type.
+  - [x] NPC quest actions have a `do:` list too, so they get every action type.
+  - [ ] If an action type turns out to be unsafe for the LLM to fire, since an LLM may choose
+        an action by mistake, let `ActionList` take a set of allowed types.
 - [ ] **Trigger action that tells nearby NPCs** (e.g. `tell-nearby: TEXT`): add text to the
       context of LLM NPCs that can see the triggering event, so that they can react to it. It
       would use `ActionContext.event` and `player` to find where the event happened, and needs

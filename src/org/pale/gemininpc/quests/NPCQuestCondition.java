@@ -1,10 +1,10 @@
 package org.pale.gemininpc.quests;
 
 import org.bukkit.configuration.ConfigurationSection;
+import org.pale.gemininpc.quests.actions.ActionList;
 import org.pale.gemininpc.quests.expr.TreeNode;
 
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -15,11 +15,16 @@ class NPCQuestCondition {
     /// Something the LLM can choose to do while the condition holds, e.g.
     ///
     ///     actions:
-    ///         confess: { set: [helga_confessed, helga_exposed], desc: "You admit hanging the banner" }
+    ///       confess:
+    ///         desc: You admit to the player that you hung the banner
+    ///         do:
+    ///           - set: [helga_confessed, helga_exposed]
     ///
-    /// @param set the facts to set when the action is done
-    /// @param desc the description given to the LLM, so that it knows when to do the action
-    record Action(String name, List<String> set, String desc) {}
+    /// @param desc the description given to the LLM: the event which the action records
+    /// @param actions what happens when the LLM does the action. This is the same kind of list as a
+    ///                trigger's, so one LLM action can do several things (e.g. set facts and give an item),
+    ///                which matters because a reply can only name one action.
+    record Action(String name, String desc, ActionList actions) {}
 
     /// actions by name, in the order they're in the file
     Map<String, Action> actions = new LinkedHashMap<>();
@@ -48,17 +53,16 @@ class NPCQuestCondition {
             QuestException.in(actionWhere, () -> {
                 ConfigurationSection a = as.getConfigurationSection(name);
                 if(a==null)
-                    throw new QuestException("must contain set: and desc:");
-                q.warnUnknownKeys(a, where + "." + actionWhere, Set.of("set", "desc"));
-                // set: is the only thing an action can do at the moment, so it's required
-                List<String> set = q.factNames(a, "set");
-                if(set.isEmpty())
-                    throw new QuestException("no set:, so this action would do nothing");
-                // the LLM only has the description to decide when to do the action
+                    throw new QuestException("must contain desc: and do:");
+                q.warnUnknownKeys(a, where + "." + actionWhere, Set.of("desc", "do"));
+                // the LLM needs the description to know what event the action records
                 String desc = a.getString("desc");
                 if(desc==null || desc.isBlank())
                     throw new QuestException("no desc:, which the LLM needs to know when to do this action");
-                actions.put(name, new Action(name, set, desc));
+                ActionList list = new ActionList(q, a, "do");
+                if(list.isEmpty())
+                    throw new QuestException("no do: actions, so this action would do nothing");
+                actions.put(name, new Action(name, desc, list));
             });
         }
     }

@@ -14,6 +14,12 @@ import org.bukkit.inventory.ItemStack;
  * To add a new event type, add a record here.
  */
 public interface TriggerEvent {
+    /// The NPC involved in the event, if there is one. Records with an `npc` component provide this
+    /// automatically, because the record's accessor overrides it.
+    default NPC npc() {
+        return null;
+    }
+
     /**
      * A player has given an item to an NPC.
      */
