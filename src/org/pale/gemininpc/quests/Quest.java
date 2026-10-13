@@ -36,9 +36,9 @@ public class Quest {
     Map<String, Fact> facts = new HashMap<>();
 
     /**
-     * A set of deterministic (non-LLM) events that can trigger state changes
+     * Deterministic (non-LLM) events that can trigger state changes, in the order they're in the file
      */
-    Set<Trigger> triggers = new HashSet<>();
+    List<Trigger> triggers = new ArrayList<>();
 
     /**
      * map of NPC name to data - how they react to actions or state by adding things to their prompt

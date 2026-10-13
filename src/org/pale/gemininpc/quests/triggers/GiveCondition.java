@@ -4,6 +4,10 @@ import org.bukkit.ChatColor;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
+import org.pale.gemininpc.quests.QuestNPCs;
+
+import java.util.Collection;
+import java.util.List;
 
 /**
  * True when a player gives a particular item to a particular NPC: "give ITEM to NPCNAME".
@@ -49,6 +53,11 @@ public class GiveCondition implements ITriggerCondition {
     public boolean check(TriggerEvent event) {
         return event instanceof TriggerEvent.Give(var npc, var given)
                 && itemMatches(given)
-                && npc.getName().equals(npcName);
+                && QuestNPCs.matches(npc.getId(), npcName);  // by NPC name, or persona if only one NPC has it
+    }
+
+    @Override
+    public Collection<String> npcNames() {
+        return List.of(npcName);
     }
 }

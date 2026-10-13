@@ -9,6 +9,7 @@ import org.pale.gemininpc.quests.actions.ActionContext;
 import org.pale.gemininpc.quests.actions.ActionList;
 import org.pale.gemininpc.utils.TextUtils;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
@@ -64,6 +65,11 @@ public class Trigger {
             default -> throw new QuestException("on: unknown condition type \"" + ss.getFirst()
                     + "\" in \"" + s + "\", should be give or read-book");
         }
+    }
+
+    /// Names of NPCs the trigger refers to, so they can be checked against the NPCs which exist.
+    public Collection<String> npcNames() {
+        return cond.npcNames();
     }
 
     /**

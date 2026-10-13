@@ -2,6 +2,7 @@ package org.pale.gemininpc;
 
 import net.citizensnpcs.api.ai.event.NavigationCancelEvent;
 import net.citizensnpcs.api.ai.event.NavigationCompleteEvent;
+import net.citizensnpcs.api.event.CitizensEnableEvent;
 import net.citizensnpcs.api.event.NPCRightClickEvent;
 import net.citizensnpcs.api.npc.NPC;
 import net.citizensnpcs.trait.ShopTrait;
@@ -51,6 +52,13 @@ public final class ChatEventListener implements Listener {
     public ChatEventListener(Plugin p) {
         plugin = p;
         p.getServer().getPluginManager().registerEvents(this, p);
+    }
+
+    /// Citizens loads its NPCs after the server has started, which is after our quests are loaded, and
+    /// fires this when it's done. Only then can we check the NPC names used in the quests.
+    @EventHandler
+    public void citizensEnabled(CitizensEnableEvent e) {
+        plugin.checkQuestNPCs();
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

@@ -36,6 +36,8 @@ import org.pale.gemininpc.commands.*;
 import org.pale.gemininpc.plugininterfaces.Sentinel;
 import org.pale.gemininpc.quests.Quest;
 import org.pale.gemininpc.quests.QuestException;
+import org.pale.gemininpc.quests.QuestNPCs;
+import org.pale.gemininpc.quests.QuestRegistry;
 import org.pale.gemininpc.waypoints.Waypoint;
 import org.pale.gemininpc.waypoints.Waypoints;
 
@@ -153,6 +155,9 @@ public class Plugin extends JavaPlugin implements Listener {
         // register the Actions similarly
         actionRegistry.register(new Actions(this));
 
+        // let quests find NPCs by name or persona
+        QuestNPCs.setDirectory(Plugin::questNPCInfo);
+
         loadConfigAndCreateModel();
 
         // this is the listener for pretty much ALL events EXCEPT NPC events, not just chat.
@@ -183,6 +188,32 @@ public class Plugin extends JavaPlugin implements Listener {
 
     // This is a map of persona name onto the persona string loaded from each file.
     public final Map<String, Persona> personae = new HashMap<>();
+
+    /// All the loaded quests. Replaced with a new registry each time the config is loaded.
+    QuestRegistry quests = new QuestRegistry();
+
+    public QuestRegistry getQuests() {
+        return quests;
+    }
+
+    /// Warn about NPC names in quests which don't match any NPC. This has to wait until Citizens has loaded
+    /// its NPCs, so it's called when Citizens says it's ready (see `ChatEventListener`) and after a reload,
+    /// rather than when the quests are loaded.
+    public void checkQuestNPCs() {
+        for(String w: quests.checkNPCs(QuestNPCs.getDirectory().all()))
+            warn("Quest file " + w);
+    }
+
+    /// What quests can see of every NPC Citizens knows about, spawned or not. This is how quests find the
+    /// NPCs they name; see `QuestNPCs`.
+    private static List<QuestNPCs.NPCInfo> questNPCInfo() {
+        List<QuestNPCs.NPCInfo> list = new ArrayList<>();
+        for(NPC npc: CitizensAPI.getNPCRegistry()){
+            GeminiNPCTrait t = getTraitFor(npc);
+            list.add(new QuestNPCs.NPCInfo(npc.getId(), npc.getName(), t==null ? null : t.personaName));
+        }
+        return list;
+    }
     // This is a map of common texts used in the plugin - not common templates; these are just variables
     // and can't contain templates themselves.
     private final Map<String, String> texts = new HashMap<>();
@@ -319,7 +350,10 @@ public class Plugin extends JavaPlugin implements Listener {
                 });
 
         // pull in the quests
+        // pull in the quests. These go into a new registry, which replaces the old one once they're all
+        // loaded, so a reload starts afresh.
         Plugin.log("Loading quests!");
+        QuestRegistry newQuests = new QuestRegistry();
         processFilesInConfigDirectory(c, "quest-directories",
                 (name, path) -> {
                     // skip editor backups (e.g. "quest.yml~") and anything else that isn't YAML
@@ -330,6 +364,8 @@ public class Plugin extends JavaPlugin implements Listener {
                     List<String> warnings = new ArrayList<>();
                     try {
                         Quest q = new Quest(path, warnings);
+                        newQuests.add(q, name);     // throws if the ID is already used
+                        log("Loaded quest " + q.id + " from " + name);
                     } catch (QuestException e) {
                         warn("Quest file " + name + " not loaded: " + e.getMessage());
                         if(!e.isExpected())   // probably a bug in the loader rather than in the file
@@ -342,6 +378,13 @@ public class Plugin extends JavaPlugin implements Listener {
                             warn("Quest file " + name + ": " + w);
                     }
                 });
+        // checks that need all the quests loaded
+        for(String w: newQuests.checkRequires())
+            warn("Quest file " + w);
+        quests = newQuests;
+        log("Loaded " + quests.size() + " quests");
+        // The quests' NPC names aren't checked here, because when the plugin is first enabled Citizens
+        // hasn't loaded its NPCs yet. See checkQuestNPCs().
 
         // finally pull in the common texts, which are in the "texts" section.
         ConfigurationSection cs = c.getConfigurationSection("texts");
@@ -536,6 +579,8 @@ public class Plugin extends JavaPlugin implements Listener {
         for (String name : personae.keySet()) {
             c.msg("Loaded " + ChatColor.AQUA + " " + name);
         }
+        c.msg("Loaded " + ChatColor.AQUA + quests.size() + ChatColor.RESET + " quests (see the server log for any problems)");
+        checkQuestNPCs();   // Citizens has loaded its NPCs by now
 
         // reinit
         for(NPC npc: chatters){

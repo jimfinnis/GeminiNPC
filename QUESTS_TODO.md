@@ -64,11 +64,20 @@ throw.
         harmless while the only action is `set`.
 - [x] **Facts named in `set:` are checked**, for both triggers and NPC actions, by
       `Quest.factNames`. `set:` can be a single fact or a list in both places.
-- [ ] **Validate the rest of the file at load time:**
+- [x] **Validate the rest of the file at load time:**
   - [x] every `objectives[].done` and `complete-when` parses as an expression against the
     facts (`Quest.parseExpression`, which `when:` also uses);
-  - [ ] `requires` should name quests that exist; check this after all quests have loaded;
-  - [ ] participant names should be known NPCs, or at least a typo should produce a warning.
+  - [x] `requires` names quests that exist, and not the quest itself (a warning, from
+    `QuestRegistry.checkRequires` once all quests are loaded);
+  - [x] participant names are NPCs with the GeminiNPC trait, each a different NPC, and
+    `give ... to NPC` names any NPC (warnings, from `QuestRegistry.checkNPCs`).
+  - [x] How a quest name finds an NPC (`QuestNPCs.resolve`): the NPC with that name, ignoring
+    case and colour codes; failing that, the NPC with that persona, if exactly one NPC has
+    it. So `prune` finds "Prunesquallor". Names are resolved each time, not cached, so they
+    follow renames and persona changes. `GiveCondition` uses this, and so must anything
+    that later looks up participants (e.g. adding prompts).
+  - [ ] Cycles in `requires` (a needs b, b needs a) aren't detected; neither quest could ever
+    start.
 - [x] `objectives` and `complete-when` are loaded into `Quest.objectives` and
       `Quest.completeWhen`. `complete-when` is optional; without it a quest is open-ended.
 - [ ] Load `on-complete` as an `ActionList` (it's already written in that format in
@@ -78,8 +87,13 @@ throw.
 
 ## Wiring quests into the plugin
 
-- [ ] **Keep the loaded quests.** `Plugin` builds a `Quest` for each file and then throws it
-      away. Store them in a map by `id` and rebuild it on `/gemini reload`.
+- [x] **Keep the loaded quests.** `Plugin.quests` is a `QuestRegistry` of quests by ID. It's
+      rebuilt each time the config loads, including on `/gemini reload`.
+  - The NPC check (`Plugin.checkQuestNPCs`) can't run when the quests load at startup,
+    because Citizens hasn't loaded its NPCs yet. It runs on `CitizensEnableEvent` (in
+    `ChatEventListener`) and after `/gemini reload`.
+  - [ ] Test in game: check the warnings appear at startup and after `/gemini reload`, and
+        not before Citizens has loaded. `/citizens reload` doesn't re-run the check.
 - [x] **Decide what happens when a quest file is bad.** A bad file is now skipped with a
       warning such as `Quest file test.yml not loaded: participants.helga #2: when: expected a
       value but the expression ended, in "not"`, and the plugin carries on. As a
@@ -96,8 +110,7 @@ throw.
   - Only `.yml` and `.yaml` files are loaded, so editor backups are skipped.
   - [x] Tests for broken files, in `test/org/pale/gemininpc/quests/QuestLoadTest.java`. It also
         checks that the example quest, `banner.yml`, loads with no warnings.
-  - [ ] Duplicate quest `id`s across files aren't detected. Do this when quests are kept in a
-        map (see the item above).
+  - [x] A quest whose `id` is already used by another file isn't loaded; the first one is kept.
   - [x] `Plugin.processFilesInConfigDirectory`, which personae and templates also use: a missing
         directory no longer stops the whole config loading, and the `~` backup check now tests
         each file rather than the directory name.
