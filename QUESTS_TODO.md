@@ -142,7 +142,7 @@ throw.
     until it's fixed.
   - [ ] Anything else that changes quest state must call `Plugin.saveQuestStates()` too,
         notably NPC quest actions once they're wired in.
-  - [ ] Test in game: set some facts, restart the server, and check `/gemini quest state`.
+  - [x] Tested in game: quest progress survives a server restart.
 - [x] **Evaluating conditions.** `Instance.test(expr)` evaluates an expression against the
       instance's facts; it's true if the result is a nonzero integer.
   - [ ] An expression that type-checks badly at runtime (e.g. `"x" and f`) throws. Nothing
