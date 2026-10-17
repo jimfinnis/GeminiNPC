@@ -15,9 +15,13 @@ facts:
   helga_exposed:
     rumours:
       the-nuns-know:
-        # This is a rumour that spreads to [nuns]; list members are either a
-        # single NPC or a group of NPCs.
+        # This is a rumour that spreads to [nuns] once helga_exposed is true for
+        # a player, and only when talking to that player. List members are either
+        # a single NPC or a group of NPCs. "except" leaves out NPCs (or groups)
+        # it shouldn't reach: Helga knows already, and the Lady Chanter should
+        # hear it from the player.
         spreads-to: [nuns]
+        except: [helga, ladychanter]
         text: It is whispered that Helga hung the banner on the walls.
   helga_confessed: {}
   knows_lofgar: {}

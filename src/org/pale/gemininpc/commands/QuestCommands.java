@@ -6,6 +6,7 @@ import org.bukkit.OfflinePlayer;
 import org.pale.gemininpc.Plugin;
 import org.pale.gemininpc.quests.QuestDebug;
 import org.pale.gemininpc.quests.QuestException;
+import org.pale.gemininpc.quests.QuestNPCs;
 
 import java.util.Arrays;
 import java.util.List;
@@ -20,7 +21,7 @@ public class QuestCommands {
         this.plugin = plugin;
     }
 
-    static final String USAGE = "list | state [PLAYER] | set PLAYER QUEST FACT true|false | reset PLAYER [QUEST]";
+    static final String USAGE = "list | groups | state [PLAYER] | set PLAYER QUEST FACT true|false | reset PLAYER [QUEST]";
 
     @SuppressWarnings("unused")
     @Cmd(desc = "look at and change quest state, for testing", usage = USAGE)
@@ -35,6 +36,7 @@ public class QuestCommands {
         try {
             List<String> lines = switch(args[0]){
                 case "list" -> debug.list();
+                case "groups" -> QuestDebug.groups(QuestNPCs.getDirectory().all());
                 case "state" -> {
                     // with no player, show the state of whoever ran the command
                     if(rest.length==0 && c.getPlayer()==null)
@@ -67,7 +69,7 @@ public class QuestCommands {
 
     /// Find a player by name, online or not, and return their UUID. Offline players are found among those
     /// who have played on the server before.
-    private static UUID findPlayer(String name){
+    public static UUID findPlayer(String name){
         var online = Bukkit.getPlayerExact(name);
         if(online!=null)
             return online.getUniqueId();

@@ -33,6 +33,17 @@ public class QuestDebug {
         return lines;
     }
 
+    /// One line per group of NPCs, listing its members (see `QuestNPCs`).
+    public static List<String> groups(Collection<QuestNPCs.NPCInfo> npcs){
+        List<String> lines = new ArrayList<>();
+        var groups = QuestNPCs.groups(npcs);
+        if(groups.isEmpty())
+            lines.add("No NPCs are in groups.");
+        for(var e: groups.entrySet())
+            lines.add(e.getKey() + ": " + String.join(", ", e.getValue().stream().map(QuestNPCs.NPCInfo::name).toList()));
+        return lines;
+    }
+
     /// Each quest's status for a player, with the facts of any quest they've made progress in.
     /// @param player the player's UUID; world quests show the world's state whoever is asked about
     public List<String> state(UUID player){

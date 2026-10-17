@@ -1,6 +1,6 @@
 string: |
     You are the Lady Chanter of the Convent.
-    The nuns you know about are: {{String.join(",",nuns)}}.
+    The nuns you know about are: {{String.join(", ",exclude(group("nuns"),name))}}.
 
     You cordially dislike Roshilde, think Frieda is naive, and think Helga is charming, sweet and a beautiful singer.
     Helga was a foundling, left outside the convent as a baby.
@@ -8,3 +8,6 @@ string: |
 
 yaml-files:
     - special/nuns.yml
+
+# groups of NPCs used by quests, e.g. spreads-to: [nuns]
+groups: [nuns]

@@ -82,10 +82,12 @@ bland default persona.
 * `/gemini enable` - enable API requests
 * `/gemini dumpmem` - dump NPC's memory to console
 * `/gemini prompt` - show system prompt on console
+* `/gemini context [<player>]` - show the selected NPC's context object on console, as if it were talking to you or to the player named (online or not). From the console with no player named, only world quests' guidance is included
 
 ### Quests (for testing)
 
 * `/gemini quest list` - list the loaded quests, with their scope and what they require
+* `/gemini quest groups` - list the groups of NPCs (see "YAML persona files") and who is in each
 * `/gemini quest state [<player>]` - show each quest's status for a player (yourself if no player is given): complete, active, or waiting for the quests it requires, with the values of its facts
 * `/gemini quest set <player> <quest> <fact> true|false` - set a fact, which may complete the quest. It works on quests that aren't active yet, to set up a test, but setting a fact back to false doesn't undo completion
 * `/gemini quest reset <player> [<quest>]` - start a quest again for a player. Naming a world quest resets it for everyone; with no quest named, all the player's own quests are reset but world quests are left alone
@@ -118,7 +120,22 @@ default-gender: non-binary
 template-values:
     key: value
     key2: value2
+
+# Groups of NPCs which every NPC with this persona is in. Quests can name a group instead of a
+# single NPC, e.g. to give all the nuns a prompt, or to spread a rumour to them. Optional.
+
+groups: [nuns]
 ```
+
+A plain text persona can't list groups, so they can also be set in `config.yml`, where each member is an NPC's
+name or a persona (meaning every NPC with that persona):
+```
+npc-groups:
+    doctors: [prune]
+    castle-staff: [Prunesquallor, lofgar]
+```
+An NPC is in a group if either says so. When a quest uses a name, a group of that name comes first, then an NPC
+with that name, then the one NPC with that persona. `/gemini quest groups` lists the groups and their members.
 
 ## Templating
 
@@ -137,7 +154,8 @@ More templates values can be set in two ways:
 
 The following template functions are available:
 * `choose(list)` - randomly choose one of the items in the list. Sublists are permitted - see below.
-* `exclude(list,string)` returns a new list with any strings containing `s` removed. Useful in constructions like `choose(exclude(somelist,name))` to remove the NPC itself from lists.
+* `exclude(list,string)` returns a new list with any strings containing `s` removed (ignoring colour codes). Useful in constructions like `choose(exclude(somelist,name))` to remove the NPC itself from lists.
+* `group(name)` - the names of the NPCs in a group (see "YAML persona files"), sorted, e.g. `choose(exclude(group("nuns"),name))` for another nun. The persona is only rendered when the NPC's conversation is created, so NPCs added to the group later aren't known to it until a `/gemini reload` or persona change.
 * `pick(list, n, delimiter)` - randomly choose `n` items from the list and join them with the delimiter. The same item
 cannot be chosen multiple times. Sublists are permitted - see below.
 * `random(lower, upper)` - randomly choose an integer between lower (inclusive) and upper (exclusive)
@@ -256,22 +274,16 @@ For example, a YAML persona could be:
 ```yaml
 string: |
     You are the Lady Chanter of the Convent.
-    {{choose(relationships)}} {{choose(nuns)}}.
-    {{choose(relationships)}} {{choose(nuns)}}.
+    {{choose(relationships)}} {{choose(exclude(group("nuns"),name))}}.
+    {{choose(relationships)}} {{choose(exclude(group("nuns"),name))}}.
 
 yaml-files: 
     - special/nuns.yml
-```
-and then in the `special/nuns.yaml` file in the plugin's data directory you could have:
-```yaml
-nuns:
- - Frieda
- - Helga
- - Roshilde
- - Gertrud
- - Ylva
- - the Lady Chanter
 
+groups: [nuns]
+```
+and then in the `special/nuns.yml` file in the plugin's data directory you could have:
+```yaml
 relationships:
  - You like
  - You dislike
@@ -279,9 +291,12 @@ relationships:
  - You are in love with
  - You are in a rivalry with
 ```
+The nuns themselves come from the `nuns` group, so they're the NPCs whose personae say `groups: [nuns]`. A list
+of names in the extra data file would work too, and is the way to include characters who aren't NPCs.
+
 You might think it a good idea to have the
 ```yaml
-{{choose(relationships)}} {{choose(nuns)}}
+{{choose(relationships)}} {{choose(exclude(group("nuns"),name))}}
 ```
 block inside a template variable, but that won't work - templates inside template variables aren't currently processed. So
 we just repeat it.
@@ -329,7 +344,7 @@ Most of what the context contains is obvious, but here are some notes:
 * `location description` is a description of the waypoint.
 * `region` is information from the JCFUtils plugin's region mechanism - it gives the region name and description (if there is one).
 * `current-state` is set from the current state template as described above. It is calculated immediately before any request is sent to the AI.
-* `quest` is a list of guidance from the quests the NPC is part of, for the player it's talking to: the `prompt` of every quest condition that's currently true for this NPC. It's always present (an empty list when there's no guidance), and a new value replaces the old one entirely, which the `common` template tells the model.
+* `quest` is a list of guidance from the quests the NPC is part of, for the player it's talking to: the `prompt` of every quest condition that's currently true for this NPC, followed by the `text` of any rumours that have spread to it (a fact's `rumours`, whose `spreads-to` names this NPC or a group it's in, and whose `except` doesn't, once the fact is true for that player, or for everyone in a world quest). It's always present (an empty list when there's no guidance), and a new value replaces the old one entirely, which the `common` template tells the model.
 * `quest-actions` lists the quest actions the NPC can take now, for that player, each with its name and description; likewise always present. When the model puts one of these names in its reply's action field, the action is checked again (the reply may arrive a while later) and run on that player's quest state. A quest action that isn't offered at that moment is ignored rather than treated as a built-in action.
 
 

@@ -203,8 +203,35 @@ throw.
           Done (see "NPC quest actions" below). Tested in game: Prunesquallor did
           `tell_about_helga` when told about the banner, and Helga did `confess` when accused.
 - [ ] **Rumours.** When a fact with rumours becomes true, add each rumour's text to the context
-      of the NPCs in `spreads-to`. The names there can be single NPCs or groups such as `[nuns]`,
-      so a group needs defining somewhere, perhaps in the persona or in config.
+      of the NPCs in `spreads-to`. The names there can be single NPCs or groups such as `[nuns]`.
+  - [x] **NPC groups.** An NPC is in a group if its YAML persona lists it under `groups:`, or
+        `npc-groups:` in config.yml names the NPC or its persona (for plain text personae and
+        one-offs). `QuestNPCs.resolve` tries a group first, then an NPC name, then a persona, so
+        a group works anywhere a quest names an NPC: `participants:` (each member gets the
+        group's prompts and actions, as well as any of its own), `give ... to`, and
+        `spreads-to`, all checked by `checkNPCs`, which also warns about a group hiding an NPC
+        of the same name. Config members that match no NPC are warned about too. `nun.yml`,
+        `helga.yml` and `ladychanter.yml` are in `nuns`. `/gemini quest groups` lists them,
+        and `/gemini info` shows an NPC's groups. The `nuns` group works in game (the rumour
+        reaches Frieda); the two commands are untested.
+  - [x] **`group(name)` template function**, giving the members' names (sorted, colour
+        stripped). The three nun personae use `exclude(group("nuns"),name)` instead of the
+        `nuns:` list, which is gone from `special/nuns.yml`. Not yet tested in game: check
+        with `/gemini reload` that each nun's persona lists the other five.
+  - [x] Whose state a rumour comes from: decided (2026-10-17) on the state used for the
+        conversation, so in a player quest only the player who made the fact true hears it,
+        and in a world quest everyone does. A per-rumour `scope: world`, letting one player's
+        progress spread to everyone, can be added if a quest needs it.
+  - [x] Spreading the rumour text: `QuestRegistry.promptsFor` adds the `text` of each rumour
+        whose fact is true and whose `spreads-to` matches the NPC, after that quest's prompts,
+        so it goes into the context's `"quest"` list. It reads the state without creating it,
+        so NPCs who only hear rumours don't make empty state for every player.
+        Tested in game: with `helga_exposed` set, Frieda has the whisper in her context, seen
+        with `/gemini context PLAYER` (which now takes a player, so it works from the console).
+  - [x] **`except:`** on a rumour leaves out NPCs or groups, matched like `spreads-to` and
+        checked by `checkNPCs`. The banner quest's rumour goes to `nuns` except Helga (who
+        knows already) and the Lady Chanter (whose stage prompt has her shocked when the
+        player tells her). The same idea might suit group participants later.
 - [x] **Firing triggers.** `QuestRegistry.fire(player, event)` runs an event through the
       triggers of every quest active for the player, then checks those quests for
       completion. Quests that become active because the event completed another one don't

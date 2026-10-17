@@ -4,6 +4,7 @@ import net.citizensnpcs.api.npc.NPC;
 import org.bukkit.entity.Player;
 import org.pale.gemininpc.quests.actions.ActionContext;
 import org.pale.gemininpc.quests.actions.ActionList;
+import org.pale.gemininpc.quests.expr.Value;
 import org.pale.gemininpc.quests.triggers.TriggerEvent;
 
 import java.util.*;
@@ -87,7 +88,10 @@ public class QuestRegistry {
 
     /// The quest prompts for an NPC talking to a player: the `prompt` of every condition whose `when` is
     /// true, for the participant entries that are this NPC (names matched with `QuestNPCs`), in the order
-    /// the quests were loaded and the conditions are in their files.
+    /// the quests were loaded and the conditions are in their files. Each quest's prompts are followed by the
+    /// `text` of its rumours which spread to this NPC (in `spreads-to` and not in `except`, names matched the
+    /// same way) and whose
+    /// fact is true in the state used for this player.
     ///
     /// Quests which are active or complete for the player both count; only quests which haven't started
     /// give nothing. Complete quests count so that a stage reached by the very fact that completes the
@@ -110,6 +114,20 @@ public class QuestRegistry {
                 for(NPCQuestCondition c: e.getValue().conditions){
                     if(c.prompt!=null && inst.test(c.when))
                         prompts.add(c.prompt);
+                }
+            }
+            // then the rumours this NPC has heard: those of facts which are true in this state, so only for
+            // the player who made them true (or everyone, in a world quest). With no state yet, every fact is
+            // false, so there are none.
+            Instance inst = states.get(q, player);
+            if(inst==null)
+                continue;
+            for(var f: q.facts.entrySet()){
+                if(f.getValue().rumours.isEmpty() || !inst.get(f.getKey()).equals(Value.TRUE))
+                    continue;
+                for(Fact.Rumour r: f.getValue().rumours){
+                    if(r.reaches(npcId))
+                        prompts.add(r.text());
                 }
             }
         }
@@ -259,23 +277,24 @@ public class QuestRegistry {
         return warnings;
     }
 
-    /// Check that the NPC names used in quests each find exactly one NPC (see `QuestNPCs.resolve`). Returns
-    /// warnings, each starting with the quest file's name.
+    /// Check that the NPC names used in quests each find exactly one NPC, or a group (see
+    /// `QuestNPCs.resolve`). Returns warnings, each starting with the quest file's name.
     public List<String> checkNPCs(Collection<QuestNPCs.NPCInfo> npcs){
         List<String> warnings = new ArrayList<>();
         for(Quest q: quests.values()){
             String file = files.get(q.id);
-            // participants are given prompts, so they need the trait, and each must be a different NPC
+            // participants are given prompts, so they need the trait, and each single NPC must be a
+            // different one (a group may overlap them, giving its members the group's prompts as well)
             Map<Integer, String> participantIds = new HashMap<>();
             for(String npc: q.npcData.keySet()){
                 String where = file + ": participants." + npc + ": ";
-                QuestNPCs.Resolution r = QuestNPCs.resolve(npc, npcs);
-                if(r.npc()==null)
-                    warnings.add(where + r.problem());
-                else if(r.npc().persona()==null)
-                    warnings.add(where + "NPC \"" + r.npc().name()
-                            + "\" doesn't have the GeminiNPC trait, so it can't be given quest prompts");
-                else {
+                QuestNPCs.Resolution r = resolveChecked(npc, where, npcs, warnings);
+                for(QuestNPCs.NPCInfo i: r.npcs()){
+                    if(i.persona()==null)
+                        warnings.add(where + "NPC \"" + i.name() + "\"" + (r.isGroup() ? ", in the group," : "")
+                                + " doesn't have the GeminiNPC trait, so it can't be given quest prompts");
+                }
+                if(r.npc()!=null){
                     String other = participantIds.put(r.npc().id(), npc);
                     if(other!=null)
                         warnings.add(where + "this is the same NPC (\"" + r.npc().name() + "\") as participants."
@@ -284,13 +303,32 @@ public class QuestRegistry {
             }
             // other references (e.g. who an item is given to) can be any NPC
             for(int i=0; i<q.triggers.size(); i++){
-                for(String npc: q.triggers.get(i).npcNames()){
-                    QuestNPCs.Resolution r = QuestNPCs.resolve(npc, npcs);
-                    if(r.npc()==null)
-                        warnings.add(file + ": triggers #" + (i+1) + ": " + r.problem());
+                for(String npc: q.triggers.get(i).npcNames())
+                    resolveChecked(npc, file + ": triggers #" + (i+1) + ": ", npcs, warnings);
+            }
+            // rumours go into prompts, but a group may include NPCs without the trait, who just don't hear them
+            for(var f: q.facts.entrySet()){
+                for(Fact.Rumour rumour: f.getValue().rumours){
+                    for(String npc: rumour.npcNames())
+                        resolveChecked(npc, file + ": facts." + f.getKey() + ": spreads-to: ", npcs, warnings);
+                    for(String npc: rumour.except())
+                        resolveChecked(npc, file + ": facts." + f.getKey() + ": except: ", npcs, warnings);
                 }
             }
         }
         return warnings;
+    }
+
+    /// Resolve a name for `checkNPCs`, adding a warning if it finds nothing, or if it's a group that hides
+    /// an NPC or persona of the same name.
+    private static QuestNPCs.Resolution resolveChecked(String name, String where,
+                                                      Collection<QuestNPCs.NPCInfo> npcs, List<String> warnings){
+        QuestNPCs.Resolution r = QuestNPCs.resolve(name, npcs);
+        if(r.problem()!=null)
+            warnings.add(where + r.problem());
+        else if(r.isGroup() && QuestNPCs.namesAnNPC(name, npcs))
+            warnings.add(where + "\"" + name + "\" is a group, and also the name or persona of an NPC; "
+                    + "it means the group");
+        return r;
     }
 }

@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -102,7 +103,7 @@ public class QuestRegistryTest {
     @Test
     void participantMissing() throws IOException {
         add("a.yml", quest("a", PARTICIPANT));
-        assertEquals(List.of("a.yml: participants.helga: there is no NPC called \"helga\", or with that persona"),
+        assertEquals(List.of("a.yml: participants.helga: there is no NPC or group called \"helga\", or NPC with that persona"),
                 reg.checkNPCs(List.of(plain(2, "Bob"))));
     }
 
@@ -152,7 +153,7 @@ public class QuestRegistryTest {
                     do:
                       - set: f
                 """));
-        assertEquals(List.of("a.yml: triggers #2: there is no NPC called \"bob\", or with that persona"),
+        assertEquals(List.of("a.yml: triggers #2: there is no NPC or group called \"bob\", or NPC with that persona"),
                 reg.checkNPCs(List.of(chat(1, "Helga", "helga"))));
     }
 
@@ -172,13 +173,13 @@ public class QuestRegistryTest {
 
     @Test
     void exampleQuestNPCs() {
-        // as on the test server: some NPCs are named in the quest by their persona
+        // as on the test server: some NPCs are named in the quest by their persona, and two are nuns
         Quest q = new Quest(Paths.get("exampleconfig/quests/banner.yml"), warnings);
         reg.add(q, "banner.yml");
         assertEquals(List.of(), reg.checkNPCs(List.of(
-                chat(1, "Lady Chanter", "ladychanter"),
+                new QuestNPCs.NPCInfo(1, "Lady Chanter", "ladychanter", Set.of("nuns")),
                 chat(2, "Prunesquallor", "prune"),
-                chat(3, "Helga", "helga"),
+                new QuestNPCs.NPCInfo(3, "Helga", "helga", Set.of("nuns")),
                 chat(4, "Lofgar", "lofgar"))));
     }
 }

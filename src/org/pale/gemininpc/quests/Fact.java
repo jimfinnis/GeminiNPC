@@ -3,7 +3,9 @@ package org.pale.gemininpc.quests;
 import org.bukkit.configuration.ConfigurationSection;
 import org.pale.gemininpc.quests.expr.Value;
 
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -15,11 +17,18 @@ import java.util.Set;
  */
 public class Fact {
     record Rumour (
-            Set<String> npcNames, // NPCs to whom this particular rumour spreads
+            Set<String> npcNames, // NPCs (or groups) to whom this particular rumour spreads
+            Set<String> except,   // NPCs (or groups) it doesn't reach, even if they're among those above
             String text         // the text that gets adding to those NPC prompts when the rumour is true
-    ) {}
+    ) {
+        /// True if the rumour spreads to this NPC (names matched with `QuestNPCs`).
+        boolean reaches(int npcId) {
+            return npcNames.stream().anyMatch(n -> QuestNPCs.matches(npcId, n))
+                    && except.stream().noneMatch(n -> QuestNPCs.matches(npcId, n));
+        }
+    }
 
-    Set<Rumour> rumours = new HashSet<>();
+    List<Rumour> rumours = new ArrayList<>();    // in the order they are in the file
 
     /// @param where where the fact is in the quest file, for warnings
     /// @param cs the fact's section, or null if the fact has no data (e.g. "mustard-found:" with no value)
@@ -35,11 +44,12 @@ public class Fact {
             ConfigurationSection r = rs.getConfigurationSection(name);
             if(r==null)
                 throw new QuestException("rumours." + name + " must contain spreads-to: and text:");
-            q.warnUnknownKeys(r, where + ".rumours." + name, Set.of("spreads-to", "text"));
+            q.warnUnknownKeys(r, where + ".rumours." + name, Set.of("spreads-to", "except", "text"));
             String text = r.getString("text");
             if(text==null)
                 throw new QuestException("rumours." + name + ": no text:");
-            rumours.add(new Rumour(new HashSet<>(r.getStringList("spreads-to")), text));
+            rumours.add(new Rumour(new HashSet<>(r.getStringList("spreads-to")),
+                    new HashSet<>(r.getStringList("except")), text));
         }
     }
 

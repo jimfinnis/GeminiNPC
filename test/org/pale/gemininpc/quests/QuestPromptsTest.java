@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -30,11 +31,11 @@ public class QuestPromptsTest {
     @BeforeEach
     void setUp() {
         QuestNPCs.setDirectory(() -> List.of(
-                new QuestNPCs.NPCInfo(LADY_CHANTER, "Lady Chanter", "ladychanter"),
+                new QuestNPCs.NPCInfo(LADY_CHANTER, "Lady Chanter", "ladychanter", Set.of("nuns")),
                 new QuestNPCs.NPCInfo(PRUNE, "Prunesquallor", "prune"),
-                new QuestNPCs.NPCInfo(HELGA, "Helga", "helga"),
+                new QuestNPCs.NPCInfo(HELGA, "Helga", "helga", Set.of("nuns")),
                 new QuestNPCs.NPCInfo(ANGREN, "Angren", "lofgar"),
-                new QuestNPCs.NPCInfo(AGNES, "Sister Agnes", "nun")));
+                new QuestNPCs.NPCInfo(AGNES, "Sister Agnes", "nun", Set.of("nuns"))));
         reg.add(new Quest(Path.of("exampleconfig/quests/banner.yml"), new ArrayList<>()), "banner.yml");
     }
 
@@ -135,5 +136,89 @@ public class QuestPromptsTest {
         assertPrompts(reg.promptsFor(PRUNE, alice));
         set(alice, "lofgar_revealed");      // completes banner, so the sequel starts
         assertTrue(reg.promptsFor(PRUNE, alice).contains("Sequel prompt"));
+    }
+
+    // ---- rumours ----
+
+    @Test
+    void rumourReachesTheGroupOnceItsFactIsTrue() {
+        assertPrompts(reg.promptsFor(AGNES, alice));
+        set(alice, "helga_exposed");
+        assertPrompts(reg.promptsFor(AGNES, alice), "It is whispered that Helga hung the banner");
+        // Prunesquallor isn't a nun
+        assertFalse(reg.promptsFor(PRUNE, alice).stream().anyMatch(p -> p.startsWith("It is whispered")));
+    }
+
+    @Test
+    void rumourSkipsThoseExcepted() {
+        // Helga and the Lady Chanter are nuns, but the banner quest's rumour leaves them out
+        set(alice, "helga_exposed");
+        for (int npc : new int[]{HELGA, LADY_CHANTER})
+            assertFalse(reg.promptsFor(npc, alice).stream().anyMatch(p -> p.startsWith("It is whispered")));
+    }
+
+    @Test
+    void exceptCanNameAGroup() throws IOException {
+        Path p = dir.resolve("gossip.yml");
+        Files.writeString(p, """
+                id: gossip
+                title: Gossip
+                scope: world
+                facts:
+                  f:
+                    rumours:
+                      r:
+                        spreads-to: [sister agnes, prune]
+                        except: [nuns]
+                        text: Whisper
+                """);
+        reg.add(new Quest(p, new ArrayList<>()), "gossip.yml");
+        debug.set(alice, "gossip", "f", "true");
+        assertPrompts(reg.promptsFor(AGNES, alice));
+        assertTrue(reg.promptsFor(PRUNE, alice).contains("Whisper"));
+    }
+
+    @Test
+    void rumourIsPerPlayer() {
+        set(alice, "helga_exposed");
+        assertPrompts(reg.promptsFor(AGNES, bob));
+    }
+
+    @Test
+    void rumourComesAfterTheNPCsOwnPrompts() throws IOException {
+        Path p = dir.resolve("gossip.yml");
+        Files.writeString(p, """
+                id: gossip
+                title: Gossip
+                scope: world
+                facts:
+                  f:
+                    rumours:
+                      first:
+                        spreads-to: [nuns, sister agnes]    # Agnes twice, but she hears it once
+                        text: First rumour
+                      second:
+                        spreads-to: [prune]
+                        text: Not for Agnes
+                      third:
+                        spreads-to: [nuns]
+                        text: Third rumour
+                participants:
+                  sister agnes:
+                    - when: f
+                      prompt: Agnes's own
+                """);
+        reg.add(new Quest(p, new ArrayList<>()), "gossip.yml");
+        debug.set(alice, "gossip", "f", "true");
+        // a world quest's rumour reaches everyone, even with no player
+        for (UUID player : new UUID[]{alice, bob, null})
+            assertPrompts(reg.promptsFor(AGNES, player), "Agnes's own", "First rumour", "Third rumour");
+    }
+
+    @Test
+    void noRumourMakesNoState() {
+        // asking about a nun who's no participant mustn't create (and so save) state for the player
+        reg.promptsFor(AGNES, bob);
+        assertNull(reg.getStates().get(reg.get("banner"), bob));
     }
 }

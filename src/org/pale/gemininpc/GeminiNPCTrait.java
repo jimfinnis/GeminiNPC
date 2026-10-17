@@ -38,6 +38,7 @@ import org.pale.gemininpc.utils.TemplateFunctions;
 import org.pale.gemininpc.utils.TransientNotification;
 import org.pale.gemininpc.utils.TransientNotificationMap;
 import org.pale.gemininpc.waypoints.Waypoint;
+import org.pale.gemininpc.quests.QuestNPCs;
 import org.pale.gemininpc.quests.triggers.TriggerEvent;
 import org.pale.gemininpc.waypoints.Waypoints;
 import org.pale.jcfutils.region.Region;
@@ -844,6 +845,10 @@ public class GeminiNPCTrait extends Trait {
     void showInfo(CallInfo c) {
         c.msg("NPC " + getNPC().getName());
         c.msg("  Persona: " + personaName + ", gender: "+gender);
+        for(var i: QuestNPCs.getDirectory().all()){
+            if(i.id()==getNPC().getId() && !i.groups().isEmpty())
+                c.msg("  Groups: " + String.join(", ", i.groups()));
+        }
         c.msg("  NPC respond probability: "+npcRespondProb);
         c.msg("  Waypoints:");
         for (String name : waypoints.getWaypointNames()) {

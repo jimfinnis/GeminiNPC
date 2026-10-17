@@ -57,9 +57,10 @@ public class QuestLoadTest {
         assertEquals(Set.of("ladychanter", "helga", "prune", "lofgar"), q.npcData.keySet());
         assertEquals(4, q.npcData.get("ladychanter").conditions.size());
 
-        Set<Fact.Rumour> rumours = q.getFact("helga_exposed").rumours;
+        List<Fact.Rumour> rumours = q.getFact("helga_exposed").rumours;
         assertEquals(1, rumours.size());
-        assertEquals(Set.of("nuns"), rumours.iterator().next().npcNames());
+        assertEquals(Set.of("nuns"), rumours.getFirst().npcNames());
+        assertEquals(Set.of("helga", "ladychanter"), rumours.getFirst().except());
 
         // conditions are in a set, so find Helga's one with an action
         NPCQuestCondition.Action confess = q.npcData.get("helga").conditions.stream()

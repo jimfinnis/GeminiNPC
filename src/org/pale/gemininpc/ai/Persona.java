@@ -13,6 +13,7 @@ import org.pale.gemininpc.waypoints.Waypoints;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +34,10 @@ public class Persona {
 
     // the "current-state" template, regenerated as part of the context in every response.
     public String current_state;
+
+    /// The groups of NPCs (used by quests, e.g. `spreads-to: [nuns]`) which every NPC with this persona is in.
+    /// From `groups:` in a YAML persona; a plain text persona has none.
+    final public List<String> groups = new ArrayList<>();
 
     /**
      * This method is called once at the start of the plugin to set up the template loader.
@@ -121,6 +126,8 @@ public class Persona {
         // It contains information about what the character is currently thinking.
 
         this.current_state = yaml.getString("current-state");
+
+        groups.addAll(yaml.getStringList("groups"));
         plugin.getLogger().severe("Current state template: "+current_state);
     }
 

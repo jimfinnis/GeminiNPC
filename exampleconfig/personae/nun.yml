@@ -3,9 +3,9 @@ string: |
     The life of the castle feels distant, but you know about the following:
     {{pick(characters,2,";")}}.
     
-    The nuns you know about are: {{String.join(", ",exclude(nuns,name))}}. Helga is a little quiet, but a very good singer.
-    {{choose(relationships)}} {{choose(exclude(nuns,name))}}.
-    {{choose(relationships)}} {{choose(exclude(nuns,name))}}.
+    The nuns you know about are: {{String.join(", ",exclude(group("nuns"),name))}}. Helga is a little quiet, but a very good singer.
+    {{choose(relationships)}} {{choose(exclude(group("nuns"),name))}}.
+    {{choose(relationships)}} {{choose(exclude(group("nuns"),name))}}.
     
     {{pick(random_personality_features,3,"\n")}}
     {{pick(nun_personality_features,2,"\n")}}
@@ -13,3 +13,6 @@ string: |
         
 yaml-files: 
     - special/nuns.yml
+
+# groups of NPCs used by quests, e.g. spreads-to: [nuns]
+groups: [nuns]

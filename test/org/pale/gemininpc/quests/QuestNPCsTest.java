@@ -74,7 +74,7 @@ public class QuestNPCsTest {
 
     @Test
     void missing() {
-        assertEquals("there is no NPC called \"helga\", or with that persona", problem("helga"));
+        assertEquals("there is no NPC or group called \"helga\", or NPC with that persona", problem("helga"));
     }
 
     // ---- matches(), which uses the directory ----

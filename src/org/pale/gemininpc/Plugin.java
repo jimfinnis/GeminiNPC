@@ -257,6 +257,10 @@ public class Plugin extends JavaPlugin implements Listener {
         return quests;
     }
 
+    /// The `npc-groups:` section of config.yml: group name to the names of the NPCs or personae in it. NPCs
+    /// can also join groups through their persona's `groups:`. See `QuestNPCs`.
+    Map<String, List<String>> npcGroups = Map.of();
+
     /// Warn about NPC names in quests which don't match any NPC. This has to wait until Citizens has loaded
     /// its NPCs, so it's called when Citizens says it's ready (see `ChatEventListener`) and after a reload,
     /// rather than when the quests are loaded.
@@ -298,17 +302,25 @@ public class Plugin extends JavaPlugin implements Listener {
     }
 
     public void checkQuestNPCs() {
-        for(String w: quests.checkNPCs(QuestNPCs.getDirectory().all()))
+        var npcs = QuestNPCs.getDirectory().all();
+        for(String w: QuestNPCs.checkConfigGroups(npcGroups, npcs))
+            warn("Config " + w);
+        for(String w: quests.checkNPCs(npcs))
             warn("Quest file " + w);
     }
 
     /// What quests can see of every NPC Citizens knows about, spawned or not. This is how quests find the
     /// NPCs they name; see `QuestNPCs`.
     private static List<QuestNPCs.NPCInfo> questNPCInfo() {
+        Plugin plugin = getInstance();
         List<QuestNPCs.NPCInfo> list = new ArrayList<>();
         for(NPC npc: CitizensAPI.getNPCRegistry()){
             GeminiNPCTrait t = getTraitFor(npc);
-            list.add(new QuestNPCs.NPCInfo(npc.getId(), npc.getName(), t==null ? null : t.personaName));
+            String persona = t==null ? null : t.personaName;
+            Persona p = persona==null ? null : plugin.personae.get(persona);
+            Set<String> groups = QuestNPCs.groupsFor(npc.getName(), persona,
+                    p==null ? List.of() : p.groups, plugin.npcGroups);
+            list.add(new QuestNPCs.NPCInfo(npc.getId(), npc.getName(), persona, groups));
         }
         return list;
     }
@@ -447,7 +459,20 @@ public class Plugin extends JavaPlugin implements Listener {
                     personae.put(p.name, p);
                 });
 
-        // pull in the quests
+        // groups of NPCs, used by quests. Members are checked against the NPCs with the quests' NPC names,
+        // in checkQuestNPCs().
+        Map<String, List<String>> groups = new LinkedHashMap<>();
+        ConfigurationSection gs = c.getConfigurationSection("npc-groups");
+        if (gs != null) {
+            for (String key : gs.getKeys(false)) {
+                if (gs.isList(key))
+                    groups.put(key, gs.getStringList(key));
+                else
+                    warn("Config npc-groups." + key + " should be a list of NPC or persona names");
+            }
+        }
+        npcGroups = groups;
+
         // pull in the quests. These go into a new registry, which replaces the old one once they're all
         // loaded, so a reload starts afresh.
         Plugin.log("Loading quests!");
@@ -882,13 +907,26 @@ public class Plugin extends JavaPlugin implements Listener {
         t.plugin.getLogger().info(t.getSystemInstructions());
     }
 
-    @Cmd(desc="show NPC's context object on console, as if talking to you", cz=true, argc=0)
+    @Cmd(desc="show NPC's context object on console, as if talking to you or the player named",
+            usage="[PLAYER]", cz=true)
     public void context(CallInfo c){
         GeminiNPCTrait t = c.getCitizen();
-        // the quest guidance depends on who the NPC is talking to; from the console, there's no player,
-        // so only world quests count
-        Player p = c.getPlayer();
-        JsonObject o = t.getContextBuilder().getContext(p==null ? null : p.getUniqueId());
+        // the quest guidance depends on who the NPC is talking to; from the console with no player named,
+        // there's no player, so only world quests count
+        UUID partner;
+        try {
+            if(c.getArgs().length>1)
+                throw new QuestException("usage: /gemini context [PLAYER]");
+            Player p = c.getPlayer();
+            partner = c.getArgs().length==1 ? QuestCommands.findPlayer(c.getArgs()[0])
+                    : p==null ? null : p.getUniqueId();
+        } catch (QuestException e) {
+            c.msg(ChatColor.RED + e.getMessage());
+            return;
+        }
+        if(partner==null)
+            c.msg("No player given, so only world quests are included; try /gemini context PLAYER");
+        JsonObject o = t.getContextBuilder().getContext(partner);
         t.plugin.getLogger().info(o.toString());
     }
 

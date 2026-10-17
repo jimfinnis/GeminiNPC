@@ -59,7 +59,7 @@ Templating is the `io.marioslab.basis.template` engine (`ai/Persona.java`). A si
 - `quests/Quest.java` loads one quest file (facts, triggers, participants with their `when:`/`prompt:`/`actions:`, objectives, `complete-when`). Errors are `QuestException`s whose message says where in the file the problem is; warnings go into a list passed in, so loading doesn't need the plugin.
 - `quests/expr/` is the expression language used by `when:`, `done:` and `complete-when`.
 - `quests/triggers/` holds triggers (an `on:` condition plus a `do:` list) and the `TriggerEvent`s they respond to. `quests/actions/` holds `ActionList`, the reusable `do:` list (one-key maps such as `- set: f`) used by triggers and NPC quest actions, and later `on-complete`.
-- `QuestRegistry` holds the loaded quests by ID (`Plugin.quests`, rebuilt on each config load) and does the checks that need several quests or the NPC list. `QuestNPCs` resolves a name used in a quest to an NPC: its name, or failing that a persona used by exactly one NPC.
+- `QuestRegistry` holds the loaded quests by ID (`Plugin.quests`, rebuilt on each config load) and does the checks that need several quests or the NPC list. `QuestNPCs` resolves a name used in a quest to NPCs: a group (from a persona's `groups:` or config's `npc-groups:`), else the NPC with that name, else the one NPC using that persona.
 - Persona/quest split: personae hold only an NPC's public face and cover stories; each secret goes in the quest's stage prompt where the NPC may use it, because an LLM can't reliably keep a secret that's in its prompt. See the comment above `participants:` in `banner.yml`.
 
 ### Config

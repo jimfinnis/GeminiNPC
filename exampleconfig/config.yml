@@ -24,6 +24,14 @@ common-template-directories:
 # every .yml or .yaml file in these directories is loaded as a quest
 quest-directories:
     - plugins/GeminiNPC/quests
+
+# Groups of NPCs, which quests can name instead of a single NPC (e.g. spreads-to: [nuns]).
+# Each member is an NPC's name, or a persona, which puts every NPC with that persona in
+# the group. A YAML persona can also put its NPCs in groups with "groups: [nuns]"; that
+# can't be done in a plain text persona, so use this instead.
+#npc-groups:
+#    doctors: [prune]
+#    castle-staff: [Prunesquallor, lofgar]
     
 
 persona-directories:
